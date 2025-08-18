@@ -11,7 +11,7 @@ class TestResPartnerIDDeduplication(TransactionCase):
         self.group_membership_model = self.env["g2p.group.membership"]
         self.dedup_grp_kind_config_model = self.env["g2p.group.kind.deduplication.config"]
         self.group_kind_model = self.env["g2p.group.kind"]
-        self.config_parameter_model = self.env["ir.config_parameter"]
+        self.config_parameter_model = self.env["ir.config_parameter"].sudo()
         self.individual_1 = self.partner_model.create(
             {"name": "Individual 1", "is_registrant": True, "is_group": False}
         )

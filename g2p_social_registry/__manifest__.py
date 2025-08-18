@@ -11,6 +11,9 @@
         "g2p_registry_group",
         "g2p_registry_individual",
         "g2p_registry_membership",
+        "g2p_social_registry_theme",
+        "g2p_registry",
+        "g2p_registry_g2p_connect_rest_api",
     ],
     "external_dependencies": {"python": ["python-jose"]},
     "data": [

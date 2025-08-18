@@ -16,7 +16,7 @@
         "data/fastapi_endpoint_g2p_connect.xml",
     ],
     "external_dependencies": {"python": ["python-jose"]},
-    "application": True,
+    "application": False,
     "auto_install": False,
     "installable": True,
 }

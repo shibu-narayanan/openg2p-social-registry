@@ -26,7 +26,7 @@ class ResPartner(models.Model):
 
     def generate_unique_id(self):
         for rec in self:
-            g2p_que_background_task_model = self.env["g2p.que.background.task"]
+            g2p_que_background_task_model = self.env["g2p.que.background.task"].sudo()
             if not g2p_que_background_task_model.search(
                 [("worker_payload", "ilike", f'"registrant_id": {rec.id}')]
             ):

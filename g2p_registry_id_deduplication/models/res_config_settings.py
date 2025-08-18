@@ -18,11 +18,11 @@ class RegistryConfig(models.TransientModel):
 
     def set_values(self):
         res = super().set_values()
-        self.env["ir.config_parameter"].set_param(
+        self.env["ir.config_parameter"].sudo().set_param(
             "g2p_registry_id_deduplication.grp_deduplication_id_types_ids",
             self.grp_deduplication_id_types_ids.ids,
         )
-        self.env["ir.config_parameter"].set_param(
+        self.env["ir.config_parameter"].sudo().set_param(
             "g2p_registry_id_deduplication.ind_deduplication_id_types_ids",
             self.ind_deduplication_id_types_ids.ids,
         )

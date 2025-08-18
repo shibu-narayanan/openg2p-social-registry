@@ -420,9 +420,12 @@ class G2PRespartnerIntegration(models.Model):
 
         for field in static_fields:
             if field in self.env[model_name]._fields:
-                draft_record[field] = vals.get(field) or partner_data.get(field)
+                if field in vals:
+                    draft_record[field] = vals[field]
+                else:
+                    draft_record[field] = partner_data.get(field)
             else:
-                if vals.get(field):
+                if field in vals:
                     draft_record[field] = vals[field]
 
         if not self.is_group and (vals.get("given_name") or vals.get("family_name") or vals.get("addl_name")):
@@ -434,6 +437,23 @@ class G2PRespartnerIntegration(models.Model):
             draft_record["name"] = " ".join(filter(None, name_parts)).strip()
 
         active_record.write({"partner_data": json.dumps(draft_record)})
+
+        # After updating partner_data (the JSON), also update the direct fields
+        direct_fields = ["region"]
+        update_vals = {}
+
+        for field in direct_fields:
+            field_val = vals.get(field)
+            if field_val:
+                if field == "region":
+                    region = self.env["g2p.region"].browse(field_val)
+                    update_vals[field] = region.name if region.exists() else ""
+                else:
+                    update_vals[field] = field_val
+            else:
+                update_vals[field] = ""
+
+        active_record.write(update_vals)
 
     def action_publish(self):
         context = self.env.context

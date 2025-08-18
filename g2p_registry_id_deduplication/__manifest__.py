@@ -30,8 +30,8 @@
     # 'test': ['tests/test_registry_config.py', 'tests/test_registrant.py'],
     "demo": [],
     "images": [],
-    "application": True,
+    "application": False,
     "installable": True,
-    "auto_install": False,
+    "auto_install": True,
     "uninstall_hook": "_uninstall_cleanup",
 }
