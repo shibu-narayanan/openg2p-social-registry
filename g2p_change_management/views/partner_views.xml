@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Enhanced Partner View for Change Management Context -->
+    <record id="view_partner_form_change_management" model="ir.ui.view">
+        <field name="name">res.partner.form.change.management</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="g2p_registry_group.view_groups_form"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <!-- Add required fields for visibility logic -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Debug Info" invisible="0">
+                    <field name="has_active_draft"/>
+                    <field name="active_change_request_id"/>
+                    <field name="is_group"/>
+                    <field name="is_registrant"/>
+                </group>
+            </xpath>
+            
+            <!-- Add Published Members title before the existing members list -->
+            <xpath expr="//field[@name='group_membership_ids']" position="before">
+                <group string="Published Members" name="published_members_title"/>
+            </xpath>
+            
+            <!-- Add Draft Members section to Members page -->
+            <xpath expr="//page[@name='members']" position="inside">
+                <!-- Draft Members Section - Only show for groups with active drafts -->
+                <group string="Draft Members" name="draft_members" 
+                       invisible="0">
+                    
+                    <!-- Active Change Request Info -->
+                    <group string="Change Request Info" invisible="not active_change_request_id">
+                        <field name="active_change_request_id" readonly="1"/>
+                    </group>
+                    
+                    <!-- Draft Members List (Editable like existing members) -->
+                    <field name="draft_member_ids" readonly="disabled" nolabel="1" colspan="4">
+                        <tree editable="top" default_order="name asc">
+                            <field name="name" string="Member Name" />
+                            <field name="gender" string="Gender" />
+                            <field name="phone" string="Phone" />
+                            <field name="region" string="Region" />
+                        </tree>
+                    </field>
+                </group>
+            </xpath>
+            
+            <!-- Add Change Request button to form -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Change Management" invisible="not is_registrant">
+                    <button name="action_create_change_request" 
+                            string="Create Change Request" 
+                            type="object" 
+                            class="btn-primary"
+                            invisible="has_active_draft"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Enhanced Individual View for Change Management Context -->
+    <record id="view_individual_form_change_management" model="ir.ui.view">
+        <field name="name">res.partner.individual.form.change.management</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="g2p_registry_individual.view_individuals_form"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <!-- Add required fields for visibility logic -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Debug Info" invisible="0">
+                    <field name="has_active_draft"/>
+                    <field name="active_change_request_id"/>
+                    <field name="is_registrant"/>
+                </group>
+            </xpath>
+            
+            <!-- Add Change Request button to form -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Change Management" invisible="not is_registrant">
+                    <button name="action_create_change_request" 
+                            string="Create Change Request" 
+                            type="object" 
+                            class="btn-primary"
+                            invisible="has_active_draft"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Action to open partner form with change management context -->
+    <record id="action_partner_form_change_management" model="ir.actions.act_window">
+        <field name="name">Partner</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_partner_form_change_management"/>
+        <field name="context">{'change_management_context': True}</field>
+    </record>
+
+</odoo>

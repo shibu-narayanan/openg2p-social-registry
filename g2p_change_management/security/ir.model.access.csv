@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_change_request_user,change.request.user,model_change_request,g2p_change_management.group_change_user,1,1,1,0
+access_change_request_approver,change.request.approver,model_change_request,g2p_change_management.group_change_approver,1,1,1,0
+access_change_request_admin,change.request.admin,model_change_request,g2p_change_management.group_change_admin,1,1,1,1
+access_res_partner_user,res.partner.user,base.model_res_partner,g2p_change_management.group_change_user,1,0,1,0
+access_res_partner_approver,res.partner.approver,base.model_res_partner,g2p_change_management.group_change_approver,1,0,1,0
+access_res_partner_admin,res.partner.admin,base.model_res_partner,g2p_change_management.group_change_admin,1,1,1,1
+access_draft_record_user,draft.record.user,g2p_draft_publish.model_draft_record,g2p_change_management.group_change_user,1,1,1,0
+access_draft_record_approver,draft.record.approver,g2p_draft_publish.model_draft_record,g2p_change_management.group_change_approver,1,1,1,0
+access_draft_record_admin,draft.record.admin,g2p_draft_publish.model_draft_record,g2p_change_management.group_change_admin,1,1,1,1

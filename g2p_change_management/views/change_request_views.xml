@@ -1,0 +1,136 @@
+<odoo>
+
+<record id="view_change_request_tree" model="ir.ui.view">
+    <field name="name">change.request.tree</field>
+    <field name="model">change.request</field>
+    <field name="arch" type="xml">
+        <tree decoration-info="state == 'draft'" 
+              decoration-warning="state == 'submitted'" 
+              decoration-success="state == 'approved'" 
+              decoration-danger="state == 'rejected'">
+                                                <field name="name"/>
+            <field name="type"/>
+            <field name="is_group" string="Group"/>
+            <field name="partner_name"/>
+            <field name="requester_id"/>
+            <field name="state"/>
+            <field name="create_date"/>
+        </tree>
+    </field>
+</record>
+
+<record id="view_change_request_form" model="ir.ui.view">
+    <field name="name">change.request.form</field>
+    <field name="model">change.request</field>
+    <field name="arch" type="xml">
+        <form>
+            <header>
+                <button name="action_submit" string="Submit" type="object" 
+                        class="btn-primary" 
+                        invisible="state != 'draft'"/>
+                <button name="action_approve" string="Approve" type="object" 
+                        class="btn-success" 
+                        invisible="state != 'submitted'"/>
+                <button name="action_reject" string="Reject" type="object" 
+                        class="btn-danger" 
+                        invisible="state != 'submitted'"/>
+                <field name="state" widget="statusbar" 
+                       statusbar_visible="draft,submitted,approved,rejected"/>
+            </header>
+            <sheet>
+                                            <group>
+                    <field name="name"/>
+                    <field name="type" readonly="1"/>
+                    <field name="is_group"/>
+                    <field name="group_kind_id" invisible="type != 'create' or not is_group"/>
+                    <field name="state"/>
+                    <field name="requester_id"/>
+                    <field name="partner_id"/>
+                    <field name="description" placeholder="Describe the changes being requested..."/>
+                    <button name="action_open_partner" 
+                            string="Open Partner" 
+                            type="object" 
+                            class="btn-secondary"
+                            invisible="type == 'create' or not partner_id"/>
+                </group>
+                <notebook>
+
+                    <page string="Draft Record">
+                        
+                        <group invisible="not draft_record_id" string="Draft Record Details">
+                            <group>
+                                <field name="draft_record_id" readonly="1"/>
+                                <button name="action_open_draft_record" 
+                                        string="Open Draft Record" 
+                                        type="object" 
+                                        class="btn-secondary"/>
+                                <button name="action_edit_draft_record" 
+                                        string="Edit Draft Record" 
+                                        type="object" 
+                                        class="btn-primary"/>
+                            </group>
+                            
+                            <group string="Draft Record Information">
+                                <field name="draft_name" readonly="1"/>
+                                <field name="draft_is_group" readonly="1"/>
+                                <field name="draft_state" readonly="1"/>
+                                <field name="draft_given_name" readonly="1" invisible="draft_is_group"/>
+                                <field name="draft_family_name" readonly="1" invisible="draft_is_group"/>
+                                <field name="draft_phone" readonly="1"/>
+                                <field name="draft_region" readonly="1"/>
+                            </group>
+                        </group>
+                    </page>
+                </notebook>
+            </sheet>
+            <div class="oe_chatter">
+                <field name="message_follower_ids"/>
+                <field name="activity_ids"/>
+                <field name="message_ids"/>
+            </div>
+        </form>
+    </field>
+</record>
+
+<record id="view_change_request_search" model="ir.ui.view">
+    <field name="name">change.request.search</field>
+    <field name="model">change.request</field>
+    <field name="arch" type="xml">
+        <search>
+            <field name="name"/>
+            <field name="partner_name"/>
+            <field name="requester_id"/>
+            <field name="type"/>
+            <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+            <filter string="Submitted" name="submitted" domain="[('state', '=', 'submitted')]"/>
+            <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+            <filter string="Rejected" name="rejected" domain="[('state', '=', 'rejected')]"/>
+            <filter string="My Requests" name="my_requests" domain="[('requester_id', '=', uid)]"/>
+            <group expand="0" string="Group By">
+                <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+                <filter string="Type" name="group_type" context="{'group_by': 'type'}"/>
+                <filter string="Requester" name="group_requester" context="{'group_by': 'requester_id'}"/>
+                <filter string="Creation Date" name="group_create_date" context="{'group_by': 'create_date:day'}"/>
+            </group>
+        </search>
+    </field>
+</record>
+
+<record id="action_change_request" model="ir.actions.act_window">
+    <field name="name">Change Requests</field>
+    <field name="res_model">change.request</field>
+    <field name="view_mode">tree,form</field>
+    <field name="context">{'search_default_my_requests': 1}</field>
+</record>
+
+<menuitem id="menu_change_management_root"
+          name="Change Request"
+          sequence="10"/>
+
+<menuitem id="menu_change_request"
+          name="Change Requests"
+          parent="menu_change_management_root"
+          action="action_change_request"
+          sequence="10"/>
+
+</odoo>
