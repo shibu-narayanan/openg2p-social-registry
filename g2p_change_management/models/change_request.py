@@ -1,8 +1,8 @@
 import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class ChangeRequest(models.Model):
         required=True,
         copy=False,
         readonly=True,
-        default=lambda self: _("New"),
+        default=lambda self: "New",
     )
     
     type = fields.Selection(
@@ -196,8 +196,8 @@ class ChangeRequest(models.Model):
     @api.model
     def create(self, vals):
         """Override create to generate sequence for name field and create draft record."""
-        if vals.get("name", _("New")) == _("New"):
-            vals["name"] = self.env["ir.sequence"].next_by_code("change.request") or _("New")
+        if vals.get("name", "New") == "New":
+            vals["name"] = self.env["ir.sequence"].next_by_code("change.request") or "New"
         
         # Set default values
         if "type" not in vals:
@@ -269,7 +269,7 @@ class ChangeRequest(models.Model):
         for record in self:
             if record.type in ["modify", "delete"] and not record.partner_id:
                 raise ValidationError(
-                    _("Partner must be specified for modify and delete change requests.")
+                    "Partner must be specified for modify and delete change requests."
                 )
 
     @api.onchange("partner_id")
@@ -289,15 +289,34 @@ class ChangeRequest(models.Model):
     def action_submit(self):
         """Submit the change request for approval."""
         self.ensure_one()
+        
+        # Validate state
         if self.state != "draft":
-            raise UserError(_("Only draft change requests can be submitted."))
+            raise UserError("Only draft change requests can be submitted.")
+        
+        # Validate required fields
+        if not self.description:
+            raise UserError("Description is required before submitting.")
         
         # Validate that draft record exists for create and modify requests
         if self.type in ["create", "modify"] and not self.draft_record_id:
-            raise UserError(_("Draft record must be created before submitting."))
+            raise UserError("Draft record must be created before submitting.")
         
+        # Validate approvers exist
+        approvers = self.env["res.users"].search([
+            ("groups_id", "in", self.env.ref("g2p_change_management.group_change_approver").id)
+        ])
+        if not approvers:
+            raise UserError("No approvers found. Please contact your administrator.")
+        
+        # Update state
         self.write({"state": "submitted"})
-        self.message_post(body=_("Change request submitted for approval."))
+        
+        # Log the submission
+        self.message_post(
+            body="Change request submitted for approval by %s." % self.env.user.name,
+            subject="Change Request Submitted: %s" % self.name,
+        )
         
         # Sync draft record state if it exists
         if self.draft_record_id:
@@ -306,40 +325,65 @@ class ChangeRequest(models.Model):
         # Create activity for approvers
         self._create_approval_activity()
         
+        _logger.info("Change request %s submitted for approval by %s", self.name, self.env.user.name)
         return True
 
     def action_approve(self):
         """Approve the change request."""
         self.ensure_one()
+        
+        # Validate state
         if self.state != "submitted":
-            raise UserError(_("Only submitted change requests can be approved."))
+            raise UserError("Only submitted change requests can be approved.")
         
+        # Validate permissions
         if not self.env.user.has_group("g2p_change_management.group_change_approver"):
-            raise UserError(_("You don't have permission to approve change requests."))
+            raise UserError("You don't have permission to approve change requests.")
         
+        # Update state
         self.write({
             "state": "approved",
             "approver_id": self.env.user.id,
         })
-        self.message_post(body=_("Change request approved by %s.") % self.env.user.name)
+        
+        # Log the approval
+        self.message_post(
+            body="Change request approved by %s." % self.env.user.name,
+            subject="Change Request Approved: %s" % self.name,
+        )
         
         # Sync draft record state if it exists
         if self.draft_record_id:
             self._sync_draft_record_state()
         
         # Implement the changes based on type
-        self._implement_changes()
+        try:
+            self._implement_changes()
+            _logger.info("Changes implemented successfully for change request %s", self.name)
+        except Exception as e:
+            _logger.error("Failed to implement changes for change request %s: %s", self.name, str(e))
+            raise UserError("Failed to implement changes: %s" % str(e))
         
+        # Send notification to requester
+        self._send_approval_result_notification("approved")
+        
+        # Close related activities
+        self._close_related_activities()
+        
+        _logger.info("Change request %s approved by %s", self.name, self.env.user.name)
         return True
 
     def action_reject(self):
         """Reject the change request."""
         self.ensure_one()
-        if self.state != "submitted":
-            raise UserError(_("Only submitted change requests can be rejected."))
         
+        # Validate state
+        if self.state != "submitted":
+            raise UserError("Only submitted change requests can be rejected.")
+        
+        # Validate permissions
         if not self.env.user.has_group("g2p_change_management.group_change_approver"):
-            raise UserError(_("You don't have permission to reject change requests."))
+            raise UserError("You don't have permission to reject change requests.")
         
         # For now, we'll handle rejection directly without a wizard
         # TODO: Implement rejection wizard in future task
@@ -347,25 +391,82 @@ class ChangeRequest(models.Model):
             "state": "rejected",
             "approver_id": self.env.user.id,
         })
-        self.message_post(body=_("Change request rejected by %s.") % self.env.user.name)
+        
+        # Log the rejection
+        self.message_post(
+            body="Change request rejected by %s." % self.env.user.name,
+            subject="Change Request Rejected: %s" % self.name,
+        )
         
         # Sync draft record state if it exists
         if self.draft_record_id:
             self._sync_draft_record_state()
         
+        # Send notification to requester
+        self._send_approval_result_notification("rejected")
+        
+        # Close related activities
+        self._close_related_activities()
+        
+        _logger.info("Change request %s rejected by %s", self.name, self.env.user.name)
         return True
+    
+    def _validate_workflow_transition(self, from_state, to_state):
+        """Validate if the state transition is allowed."""
+        allowed_transitions = {
+            "draft": ["submitted"],
+            "submitted": ["approved", "rejected"],
+            "approved": [],  # No further transitions
+            "rejected": ["draft"],  # Can be reset to draft
+        }
+        
+        if to_state not in allowed_transitions.get(from_state, []):
+            raise UserError("Invalid state transition from '%s' to '%s'." % (from_state, to_state))
+        
+        return True
+    
+    def _check_workflow_permissions(self, action):
+        """Check if user has permissions for the workflow action."""
+        user = self.env.user
+        
+        if action in ["approve", "reject"]:
+            if not user.has_group("g2p_change_management.group_change_approver"):
+                raise UserError("You don't have permission to %s change requests." % action)
+        
+        elif action == "submit":
+            # Any user can submit their own requests
+            if self.requester_id != user:
+                raise UserError("You can only submit your own change requests.")
+        
+        return True
+    
+    def get_workflow_summary(self):
+        """Get a summary of the workflow status."""
+        return {
+            "name": self.name,
+            "type": dict(self._fields['type'].selection).get(self.type, self.type),
+            "state": dict(self._fields['state'].selection).get(self.state, self.state),
+            "requester": self.requester_id.name,
+            "approver": self.approver_id.name if self.approver_id else None,
+            "created_date": self.create_date,
+            "last_update": self.write_date,
+            "has_draft_record": bool(self.draft_record_id),
+            "can_submit": self.state == "draft" and self.requester_id == self.env.user,
+            "can_approve": self.state == "submitted" and self.env.user.has_group("g2p_change_management.group_change_approver"),
+            "can_reject": self.state == "submitted" and self.env.user.has_group("g2p_change_management.group_change_approver"),
+        }
 
     def action_reset_to_draft(self):
         """Reset the change request to draft state."""
         self.ensure_one()
         if self.state not in ["submitted", "rejected"]:
-            raise UserError(_("Only submitted or rejected change requests can be reset to draft."))
+            raise UserError("Only submitted or rejected change requests can be reset to draft.")
         
         self.write({
             "state": "draft",
             "rejection_reason": False,
         })
-        self.message_post(body=_("Change request reset to draft."))
+        self.message_post(body="Change request reset to draft.")
         
         return True
 
@@ -375,15 +476,83 @@ class ChangeRequest(models.Model):
             ("groups_id", "in", self.env.ref("g2p_change_management.group_change_approver").id)
         ])
         
+        if not approvers:
+            _logger.warning("No approvers found for change request %s", self.name)
+            return
+        
+        # Calculate deadline (3 business days from now)
+        deadline = fields.Date.today()
+        for _ in range(3):
+            deadline = deadline + timedelta(days=1)
+            # Skip weekends (simple implementation)
+            while deadline.weekday() >= 5:  # Saturday = 5, Sunday = 6
+                deadline = deadline + timedelta(days=1)
+        
         for approver in approvers:
-            self.env["mail.activity"].create({
+            # Create activity
+            activity = self.env["mail.activity"].create({
                 "activity_type_id": self.env.ref("mail.mail_activity_data_todo").id,
-                "note": _("Change request '%s' requires your approval.") % self.name,
+                "note": "Change request '%s' requires your approval.\n\nType: %s\nRequester: %s\nDescription: %s" % (
+                    self.name, 
+                    dict(self._fields['type'].selection).get(self.type, self.type),
+                    self.requester_id.name,
+                    self.description or "No description provided"
+                ),
                 "res_id": self.id,
                 "res_model_id": self.env["ir.model"]._get("change.request").id,
                 "user_id": approver.id,
-                "date_deadline": fields.Date.today(),
+                "date_deadline": deadline,
             })
+            
+            # Send email notification
+            self._send_approval_notification(approver, activity)
+    
+    def _send_approval_notification(self, approver, activity):
+        """Send email notification to approver."""
+        try:
+            template = self.env.ref('g2p_change_management.mail_template_change_request_approval', raise_if_not_found=False)
+            if template:
+                template.with_context(activity_id=activity.id).send_mail(self.id, force_send=True)
+            else:
+                # Fallback: send simple notification
+                self.message_post(
+                    body="Approval notification sent to %s" % approver.name,
+                    partner_ids=[approver.partner_id.id] if approver.partner_id else [],
+                    subject="Change Request Approval Required: %s" % self.name,
+                )
+        except Exception as e:
+            _logger.error("Failed to send approval notification to %s: %s", approver.name, str(e))
+    
+    def _send_approval_result_notification(self, result):
+        """Send notification to requester about approval result."""
+        try:
+            if result == "approved":
+                subject = "Change Request Approved: %s" % self.name
+                body = "Your change request '%s' has been approved by %s." % (self.name, self.approver_id.name)
+            else:  # rejected
+                subject = "Change Request Rejected: %s" % self.name
+                body = "Your change request '%s' has been rejected by %s." % (self.name, self.approver_id.name)
+            
+            self.message_post(
+                body=body,
+                subject=subject,
+                partner_ids=[self.requester_id.partner_id.id] if self.requester_id.partner_id else [],
+            )
+        except Exception as e:
+            _logger.error("Failed to send approval result notification: %s", str(e))
+    
+    def _close_related_activities(self):
+        """Close all activities related to this change request."""
+        try:
+            activities = self.env["mail.activity"].search([
+                ("res_id", "=", self.id),
+                ("res_model", "=", "change.request"),
+                ("state", "=", "planned"),
+            ])
+            activities.write({"state": "done"})
+            _logger.info("Closed %s activities for change request %s", len(activities), self.name)
+        except Exception as e:
+            _logger.error("Failed to close activities for change request %s: %s", self.name, str(e))
 
     def _implement_changes(self):
         """Implement the changes based on the change request type."""
@@ -391,16 +560,33 @@ class ChangeRequest(models.Model):
         
         if self.type == "create":
             if self.draft_record_id:
-                self.draft_record_id.action_publish()
+                # Publish the draft record to create a new partner
+                created_partner = self.draft_record_id.action_publish()
+                if created_partner:
+                    # Link the created partner to this change request
+                    self.write({"partner_id": created_partner.id})
+                    self.message_post(
+                        body="New partner '%s' has been created and published to the registry." % created_partner.name,
+                        subject="Partner Created: %s" % created_partner.name,
+                    )
+                    _logger.info("Partner created successfully: %s (ID: %s)", created_partner.name, created_partner.id)
         
         elif self.type == "modify":
             if self.draft_record_id:
-                self.draft_record_id.action_publish()
+                # For modify requests, we need to update the existing partner
+                # The draft record's action_publish will handle the modification
+                modified_partner = self.draft_record_id.action_publish()
+                if modified_partner:
+                    self.message_post(
+                        body="Partner '%s' has been updated in the registry." % modified_partner.name,
+                        subject="Partner Updated: %s" % modified_partner.name,
+                    )
+                    _logger.info("Partner updated successfully: %s (ID: %s)", modified_partner.name, modified_partner.id)
         
         elif self.type == "delete":
             if self.partner_id:
                 self.partner_id.write({"active": False})
-                self.message_post(body=_("Partner '%s' has been deactivated.") % self.partner_id.name)
+                self.message_post(body="Partner '%s' has been deactivated." % self.partner_id.name)
 
 
 
@@ -435,7 +621,7 @@ class ChangeRequest(models.Model):
         elif self.type == "modify":
             # For modify requests, copy partner data to draft
             if not self.partner_id:
-                raise UserError(_("Partner must be specified for modify requests."))
+                raise UserError("Partner must be specified for modify requests.")
             
             draft_data = {
                 "name": self.partner_id.name,
@@ -451,10 +637,10 @@ class ChangeRequest(models.Model):
         
         elif self.type == "delete":
             # For delete requests, no draft record needed
-            raise UserError(_("Draft records are not needed for delete requests."))
+            raise UserError("Draft records are not needed for delete requests.")
         
         else:
-            raise UserError(_("Invalid change request type."))
+            raise UserError("Invalid change request type.")
         
         try:
             # Create the draft record
@@ -471,7 +657,7 @@ class ChangeRequest(models.Model):
         self.ensure_one()
         
         if not self.draft_record_id:
-            raise UserError(_("No draft record to open."))
+            raise UserError("No draft record to open.")
         
         # Use the draft record's existing action methods
         if self.draft_record_id.is_group:
@@ -484,7 +670,7 @@ class ChangeRequest(models.Model):
         self.ensure_one()
         
         if not self.draft_record_id:
-            raise UserError(_("No draft record to edit."))
+            raise UserError("No draft record to edit.")
         
         # Use the draft record's existing action methods with proper context
         if self.draft_record_id.is_group:
@@ -533,12 +719,12 @@ class ChangeRequest(models.Model):
         self.ensure_one()
         
         if not self.partner_id:
-            raise UserError(_("No partner to open."))
+            raise UserError("No partner to open.")
         
         # Open partner form with change management context
         return {
             "type": "ir.actions.act_window",
-            "name": _("Partner"),
+            "name": "Partner",
             "res_model": "res.partner",
             "res_id": self.partner_id.id,
             "view_mode": "form",
@@ -552,11 +738,11 @@ class ChangeRequest(models.Model):
         self.ensure_one()
         
         if not self.partner_id:
-            raise UserError(_("No partner to edit."))
+            raise UserError("No partner to edit.")
         
         # Check if there's an active change request for this partner
         if self.partner_id.has_active_draft:
-            raise UserError(_("Cannot edit partner directly. Please use the Change Request workflow."))
+            raise UserError("Cannot edit partner directly. Please use the Change Request workflow.")
         
         # Use the existing draft record if it exists, otherwise create one
         if not self.draft_record_id:
@@ -583,7 +769,7 @@ class ChangeRequest(models.Model):
         state_mapping = {
             "draft": "draft",
             "submitted": "submitted", 
-            "approved": "approved",
+            "approved": "published",  # draft.record uses 'published' instead of 'approved'
             "rejected": "rejected",
         }
         
@@ -598,12 +784,12 @@ class ChangeRequest(models.Model):
         active_id = self.id
 
         if not self.partner_data:
-            raise UserError(_("No partner data available."))
+            raise UserError("No partner data available.")
 
         try:
             json_data = json.loads(self.partner_data)
         except json.JSONDecodeError as err:
-            raise UserError(_("Invalid JSON data in partner_data.")) from err
+            raise UserError("Invalid JSON data in partner_data.") from err
 
         context_data, additional_g2p_info = self._process_json_data(json_data)
 
