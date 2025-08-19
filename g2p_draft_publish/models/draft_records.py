@@ -14,7 +14,7 @@ class BaseInherit(models.AbstractModel):
     _inherit = "base"
 
     def web_save(self, vals, specification: dict[str, dict], next_id=None) -> list[dict]:
-        if self._name == "res.partner" and self.env.context.get("draft"):
+        if self._name == "res.partner" and self.env.context.get("draft") and hasattr(self, 'action_save_to_draft'):
             self.action_save_to_draft(vals)
             return self
 
@@ -444,16 +444,18 @@ class G2PRespartnerIntegration(models.Model):
 
         for field in direct_fields:
             field_val = vals.get(field)
-            if field_val:
+            if field_val and hasattr(active_record, field):  # Check if field exists on the model
                 if field == "region":
                     region = self.env["g2p.region"].browse(field_val)
                     update_vals[field] = region.name if region.exists() else ""
                 else:
                     update_vals[field] = field_val
-            else:
-                update_vals[field] = ""
+            elif field_val:
+                # Field doesn't exist on this model, skip it
+                _logger.warning(f"Field '{field}' does not exist on model '{active_record._name}', skipping update")
 
-        active_record.write(update_vals)
+        if update_vals:  # Only write if there are valid fields to update
+            active_record.write(update_vals)
 
     def action_publish(self):
         context = self.env.context

@@ -486,11 +486,20 @@ class ChangeRequest(models.Model):
         if not self.draft_record_id:
             raise UserError(_("No draft record to edit."))
         
-        # Use the draft record's existing action methods
+        # Use the draft record's existing action methods with proper context
         if self.draft_record_id.is_group:
-            return self.draft_record_id.action_open_group_wizard()
+            action = self.draft_record_id.action_open_group_wizard()
         else:
-            return self.draft_record_id.action_open_individual_wizard()
+            action = self.draft_record_id.action_open_individual_wizard()
+        
+        # Update the context to point to the draft record instead of change request
+        if action and 'context' in action:
+            action['context'].update({
+                'active_model': 'draft.record',
+                'active_id': self.draft_record_id.id,
+            })
+        
+        return action
 
     def _draft_to_json(self, draft_record):
         """Convert draft record data to JSON format for wizard."""
