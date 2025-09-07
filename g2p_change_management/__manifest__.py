@@ -19,8 +19,12 @@
     "data": [
         "security/rules.xml",
         "security/ir.model.access.csv",
+        "data/performance_config.xml",
         "views/partner_views.xml",
         "views/change_request_views.xml",
+        "wizards/group_member_confirmation_views.xml",
+        "wizards/change_request_wizard.xml",
+        "wizards/bulk_operations_wizard_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

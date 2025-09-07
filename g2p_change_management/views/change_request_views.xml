@@ -4,11 +4,12 @@
     <field name="name">change.request.tree</field>
     <field name="model">change.request</field>
     <field name="arch" type="xml">
-        <tree decoration-info="state == 'draft'" 
+        <tree multi_edit="1" create="true" delete="true" 
+              decoration-info="state == 'draft'" 
               decoration-warning="state == 'submitted'" 
               decoration-success="state == 'approved'" 
               decoration-danger="state == 'rejected'">
-                                                <field name="name"/>
+            <field name="name"/>
             <field name="type"/>
             <field name="is_group" string="Group"/>
             <field name="partner_name"/>
@@ -34,6 +35,9 @@
                 <button name="action_reject" string="Reject" type="object" 
                         class="btn-danger" 
                         invisible="state != 'submitted'"/>
+                <button name="action_edit_draft_record" string="Go to Draft" type="object" 
+                        class="btn-info" 
+                        invisible="not draft_record_id"/>
                 <field name="state" widget="statusbar" 
                        statusbar_visible="draft,submitted,approved,rejected"/>
             </header>
@@ -41,47 +45,30 @@
                                             <group>
                     <field name="name"/>
                     <field name="type" readonly="1"/>
-                    <field name="is_group"/>
-                    <field name="group_kind_id" invisible="type != 'create' or not is_group"/>
+                    <field name="is_group" readonly="draft_record_id"/>
+                    <field name="group_kind_id" invisible="type != 'create' or not is_group" readonly="draft_record_id"/>
                     <field name="state"/>
                     <field name="requester_id"/>
                     <field name="partner_id"/>
                     <field name="description" placeholder="Describe the changes being requested..."/>
-                    <button name="action_open_partner" 
-                            string="Open Partner" 
-                            type="object" 
-                            class="btn-secondary"
-                            invisible="type == 'create' or not partner_id"/>
                 </group>
-                <notebook>
+                
+                <!-- Draft Record Information - Direct in main form -->
+                <field name="draft_record_id" invisible="1"/>
+                <group string="Draft Record Information" invisible="not draft_record_id">
+                    <field name="draft_given_name" readonly="1" invisible="is_group"/>
+                    <field name="draft_family_name" readonly="1" invisible="is_group"/>
+                    <field name="draft_phone" readonly="1"/>
+                    <field name="draft_region" readonly="1"/>
+                </group>
+                
 
-                    <page string="Draft Record">
-                        
-                        <group invisible="not draft_record_id" string="Draft Record Details">
-                            <group>
-                                <field name="draft_record_id" readonly="1"/>
-                                <button name="action_open_draft_record" 
-                                        string="Open Draft Record" 
-                                        type="object" 
-                                        class="btn-secondary"/>
-                                <button name="action_edit_draft_record" 
-                                        string="Edit Draft Record" 
-                                        type="object" 
-                                        class="btn-primary"/>
-                            </group>
-                            
-                            <group string="Draft Record Information">
-                                <field name="draft_name" readonly="1"/>
-                                <field name="draft_is_group" readonly="1"/>
-                                <field name="draft_state" readonly="1"/>
-                                <field name="draft_given_name" readonly="1" invisible="draft_is_group"/>
-                                <field name="draft_family_name" readonly="1" invisible="draft_is_group"/>
-                                <field name="draft_phone" readonly="1"/>
-                                <field name="draft_region" readonly="1"/>
-                            </group>
-                        </group>
-                    </page>
-                </notebook>
+                
+                <!-- No Draft Record Message -->
+                <div invisible="draft_record_id" class="alert alert-info" role="alert">
+                    <strong>No Draft Record Available</strong><br/>
+                    A draft record will be created automatically when you save this change request.
+                </div>
             </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids"/>
@@ -121,7 +108,77 @@
     <field name="res_model">change.request</field>
     <field name="view_mode">tree,form</field>
     <field name="context">{'search_default_my_requests': 1}</field>
+    <field name="view_id" ref="view_change_request_tree"/>
+    <field name="binding_model_id" ref="model_change_request"/>
+    <field name="binding_view_types">list</field>
 </record>
+
+<!-- Bulk Operations Actions -->
+<record id="action_bulk_approve" model="ir.actions.server">
+    <field name="name">Bulk Approve</field>
+    <field name="model_id" ref="model_change_request"/>
+    <field name="state">code</field>
+    <field name="binding_model_id" ref="model_change_request"/>
+    <field name="binding_view_types">list</field>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_approver'))]"/>
+    <field name="code">
+if records:
+    action = records.action_bulk_approve()
+</field>
+</record>
+
+<record id="action_bulk_reject" model="ir.actions.server">
+    <field name="name">Bulk Reject</field>
+    <field name="model_id" ref="model_change_request"/>
+    <field name="state">code</field>
+    <field name="binding_model_id" ref="model_change_request"/>
+    <field name="binding_view_types">list</field>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_approver'))]"/>
+    <field name="code">
+if records:
+    action = records.action_bulk_reject()
+</field>
+</record>
+
+<record id="action_bulk_submit" model="ir.actions.server">
+    <field name="name">Bulk Submit</field>
+    <field name="model_id" ref="model_change_request"/>
+    <field name="state">code</field>
+    <field name="binding_model_id" ref="model_change_request"/>
+    <field name="binding_view_types">list</field>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_user'))]"/>
+    <field name="code">
+if records:
+    action = records.action_bulk_submit()
+</field>
+</record>
+
+<record id="action_bulk_cancel" model="ir.actions.server">
+    <field name="name">Bulk Cancel</field>
+    <field name="model_id" ref="model_change_request"/>
+    <field name="state">code</field>
+    <field name="binding_model_id" ref="model_change_request"/>
+    <field name="binding_view_types">list</field>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_user'))]"/>
+    <field name="code">
+if records:
+    action = records.action_bulk_cancel()
+</field>
+</record>
+
+<record id="action_bulk_assign" model="ir.actions.server">
+    <field name="name">Bulk Assign</field>
+    <field name="model_id" ref="model_change_request"/>
+    <field name="state">code</field>
+    <field name="binding_model_id" ref="model_change_request"/>
+    <field name="binding_view_types">list</field>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_approver'))]"/>
+    <field name="code">
+if records:
+    action = records.action_bulk_assign()
+</field>
+</record>
+
 
 <menuitem id="menu_change_management_root"
           name="Change Request"

@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import date, datetime, timedelta
 
-from odoo import api, fields, models
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -13,6 +13,7 @@ class ChangeRequest(models.Model):
     _description = "Change Request"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "create_date desc"
+    _rec_name = "name"
 
     name = fields.Char(
         string="Change Request Name",
@@ -57,12 +58,15 @@ class ChangeRequest(models.Model):
         default="draft",
         tracking=True,
         copy=False,
+        index=True,
+        help="Current state of the change request.",
     )
     
     partner_id = fields.Many2one(
         "res.partner",
         string="Partner",
         tracking=True,
+        index=True,
         help="The partner record this change request relates to. Empty for create requests.",
     )
     
@@ -84,6 +88,8 @@ class ChangeRequest(models.Model):
         required=True,
         default=lambda self: self.env.user,
         tracking=True,
+        index=True,
+        help="User who created this change request.",
     )
     
     approver_id = fields.Many2one(
@@ -110,13 +116,8 @@ class ChangeRequest(models.Model):
         string="Partner Name",
         compute="_compute_partner_name",
         store=True,
-    )
-    
-    is_group = fields.Boolean(
-        string="Is Group",
-        default=False,
-        tracking=True,
-        help="Indicates if this change request is for a group (True) or individual (False).",
+        index=True,
+        help="Name of the associated partner",
     )
     
     # Draft record computed fields for display
@@ -132,17 +133,7 @@ class ChangeRequest(models.Model):
         store=True,
     )
     
-    draft_state = fields.Selection(
-        selection=[
-            ("draft", "Draft"),
-            ("submitted", "Submitted"),
-            ("published", "Published"),
-            ("rejected", "Rejected"),
-        ],
-        string="Draft State",
-        compute="_compute_draft_fields",
-        store=True,
-    )
+
     
     draft_given_name = fields.Char(
         string="Draft Given Name",
@@ -192,13 +183,46 @@ class ChangeRequest(models.Model):
         compute="_compute_partner_fields",
         store=True,
     )
+    
+    # Validation fields
+    validation_summary = fields.Text(
+        string="Validation Summary",
+        compute="_compute_validation_summary",
+        store=True,
+        help="Summary of validation status and any errors found.",
+    )
+    
+    has_validation_errors = fields.Boolean(
+        string="Has Validation Errors",
+        compute="_compute_validation_summary",
+        store=True,
+        help="Indicates if there are any validation errors.",
+    )
+    
+    can_submit = fields.Boolean(
+        string="Can Submit",
+        compute="_compute_can_submit",
+        store=True,
+        help="Indicates if the change request can be submitted.",
+    )
+    
+    can_approve = fields.Boolean(
+        string="Can Approve",
+        compute="_compute_can_approve",
+        store=True,
+        help="Indicates if the change request can be approved.",
+    )
+    
+    can_reject = fields.Boolean(
+        string="Can Reject",
+        compute="_compute_can_reject",
+        store=True,
+        help="Indicates if the change request can be rejected.",
+    )
 
     @api.model
     def create(self, vals):
-        """Override create to generate sequence for name field and create draft record."""
-        if vals.get("name", "New") == "New":
-            vals["name"] = self.env["ir.sequence"].next_by_code("change.request") or "New"
-        
+        """Override create to generate meaningful name and create draft record."""
         # Set default values
         if "type" not in vals:
             vals["type"] = "create"
@@ -207,56 +231,96 @@ class ChangeRequest(models.Model):
         if "requester_id" not in vals:
             vals["requester_id"] = self.env.user.id
         
-        # Create the change request
+        # Create the change request first to get the ID
         change_request = super().create(vals)
+        
+        # Generate a meaningful name based on partner name and unique_id
+        if change_request.name == "New":
+            # For new change requests, we'll update the name after the draft record is created
+            change_request.name = f"CR #{change_request.id}"
         
         # Create draft record after change request is created
         draft_record = change_request._create_draft_record()
         change_request.write({"draft_record_id": draft_record.id})
         
+        # Update the change request name based on the draft record
+        change_request._update_change_request_name()
+        
         return change_request
 
-    @api.depends("partner_id")
-    def _compute_partner_name(self):
-        """Compute partner name for display purposes."""
+    def _update_change_request_name(self):
+        """Update the change request name based on partner name and unique_id."""
+        self.ensure_one()
+        
+        # Get the partner name and unique_id for display
+        partner_name = ""
+        unique_id = ""
+        
+        # Prioritize draft record name for create requests
+        if self.type == "create" and self.draft_record_id:
+            partner_name = self.draft_record_id.name
+            # For draft records, we might not have unique_id yet, so use name
+        elif self.partner_id:
+            partner_name = self.partner_id.name
+            unique_id = getattr(self.partner_id, 'unique_id', '')
+        elif self.draft_record_id:
+            partner_name = self.draft_record_id.name
+            # For draft records, we might not have unique_id yet, so use name
+        
+        # Create the name: Partner Name (Unique ID) - CR #ID
+        if partner_name and unique_id:
+            self.name = f"{partner_name} ({unique_id}) - CR #{self.id}"
+        elif partner_name:
+            self.name = f"{partner_name} - CR #{self.id}"
+        else:
+            self.name = f"CR #{self.id}"
+
+    def update_name_from_partner(self):
+        """Update change request name when partner is saved/updated."""
         for record in self:
-            if record.partner_id:
-                record.partner_name = record.partner_id.name
-            else:
-                record.partner_name = ""
+            record._update_change_request_name()
+
+    @api.depends("partner_id", "partner_id.name")
+    def _compute_partner_name(self):
+        """Compute partner name for display purposes with optimized dependencies."""
+        for record in self:
+            record.partner_name = record.partner_id.name if record.partner_id else ""
 
 
 
-    @api.depends("draft_record_id")
+    @api.depends("draft_record_id", "draft_record_id.name", "draft_record_id.is_group",
+                 "draft_record_id.given_name", "draft_record_id.family_name", 
+                 "draft_record_id.phone", "draft_record_id.region")
     def _compute_draft_fields(self):
-        """Compute draft record fields for display."""
+        """Compute draft record fields for display with optimized dependencies."""
         for record in self:
             if record.draft_record_id:
-                record.draft_name = record.draft_record_id.name
-                record.draft_is_group = record.draft_record_id.is_group
-                record.draft_state = record.draft_record_id.state
-                record.draft_given_name = record.draft_record_id.given_name
-                record.draft_family_name = record.draft_record_id.family_name
-                record.draft_phone = record.draft_record_id.phone
-                record.draft_region = record.draft_record_id.region
+                draft = record.draft_record_id
+                record.draft_name = draft.name
+                record.draft_is_group = draft.is_group
+                record.draft_given_name = draft.given_name
+                record.draft_family_name = draft.family_name
+                record.draft_phone = draft.phone
+                record.draft_region = draft.region
             else:
                 record.draft_name = ""
                 record.draft_is_group = False
-                record.draft_state = False
                 record.draft_given_name = ""
                 record.draft_family_name = ""
                 record.draft_phone = ""
                 record.draft_region = ""
 
-    @api.depends("partner_id")
+    @api.depends("partner_id", "partner_id.given_name", "partner_id.family_name", 
+                 "partner_id.phone", "partner_id.region")
     def _compute_partner_fields(self):
-        """Compute partner fields for display."""
+        """Compute partner fields for display with optimized dependencies."""
         for record in self:
             if record.partner_id:
-                record.partner_given_name = getattr(record.partner_id, "given_name", "")
-                record.partner_family_name = getattr(record.partner_id, "family_name", "")
-                record.partner_phone = record.partner_id.phone if hasattr(record.partner_id, "phone") else ""
-                record.partner_region = getattr(record.partner_id, "region", "")
+                partner = record.partner_id
+                record.partner_given_name = getattr(partner, "given_name", "")
+                record.partner_family_name = getattr(partner, "family_name", "")
+                record.partner_phone = partner.phone if hasattr(partner, "phone") else ""
+                record.partner_region = getattr(partner, "region", "")
             else:
                 record.partner_given_name = ""
                 record.partner_family_name = ""
@@ -285,22 +349,304 @@ class ChangeRequest(models.Model):
             group_kinds = self.env["g2p.group.kind"].search([])
             if len(group_kinds) == 1:
                 self.group_kind_id = group_kinds.id
+    
+    @api.constrains("type", "is_group", "group_kind_id")
+    def _check_group_kind_required_for_groups(self):
+        """Ensure group_kind_id is set for group create requests."""
+        for record in self:
+            if record.type == "create" and record.is_group and not record.group_kind_id:
+                raise ValidationError(
+                    "Group Kind is required when creating a group change request."
+                )
+
+    @api.constrains("is_group", "draft_record_id")
+    def _check_is_group_consistency(self):
+        """Prevent changes to is_group after draft record is created."""
+        for record in self:
+            if record.draft_record_id and record.is_group != record.draft_record_id.is_group:
+                raise ValidationError(
+                    "Cannot change 'Is Group' field after draft record is created. "
+                    "The draft record and change request must have consistent group status."
+                )
+    
+    @api.constrains("description")
+    def _check_description_length(self):
+        """Ensure description has meaningful content."""
+        for record in self:
+            if record.description and len(record.description.strip()) < 10:
+                raise ValidationError(
+                    "Description must be at least 10 characters long to provide meaningful context."
+                )
+    
+
+    
+    @api.constrains("state", "draft_record_id")
+    def _check_draft_record_consistency(self):
+        """Ensure draft record exists when required based on state and type."""
+        for record in self:
+            if record.state in ["submitted", "approved"] and record.type in ["create", "modify"]:
+                if not record.draft_record_id:
+                    raise ValidationError(
+                        "Draft record is required for %s requests in %s state." % (record.type, record.state)
+                    )
+    
+    @api.constrains("partner_id", "type", "state")
+    def _check_partner_consistency(self):
+        """Ensure partner consistency based on change request type."""
+        for record in self:
+            # Only apply partner_id validation during draft and submitted states
+            # During approved state, partner_id may be set by the approval process
+            if record.state in ["draft", "submitted"]:
+                if record.type == "create" and record.partner_id:
+                    raise ValidationError(
+                        "Partner should not be specified for create requests. A new partner will be created upon approval."
+                    )
+                elif record.type in ["modify", "delete"] and not record.partner_id:
+                    raise ValidationError(
+                        "Partner must be specified for %s requests." % record.type
+                    )
+    
+    @api.constrains("state")
+    def _check_state_transitions(self):
+        """Validate state transitions based on business rules."""
+        for record in self:
+            if record.state == "approved" and not record.approver_id:
+                raise ValidationError(
+                    "Approver must be set when state is approved."
+                )
+            elif record.state == "rejected" and not record.approver_id:
+                raise ValidationError(
+                    "Approver must be set when state is rejected."
+                )
+    
+    @api.depends("type", "is_group", "group_kind_id")
+    def _compute_validation_summary(self):
+        """Compute validation summary for the change request."""
+        for record in self:
+            validation_errors = []
+            
+            # Check required fields based on type
+            if record.type == "create":
+                if record.is_group and not record.group_kind_id:
+                    validation_errors.append("Group Kind is required for group creation")
+                if record.description and len(record.description.strip()) < 10:
+                    validation_errors.append("Description must be at least 10 characters if provided")
+            
+            elif record.type in ["modify", "delete"]:
+                if not record.partner_id:
+                    validation_errors.append("Partner must be specified")
+                if record.description and len(record.description.strip()) < 10:
+                    validation_errors.append("Description must be at least 10 characters if provided")
+            
+            # Check state consistency
+            if record.state in ["submitted", "approved"] and record.type in ["create", "modify"]:
+                if not record.draft_record_id:
+                    validation_errors.append("Draft record is required")
+            
+            record.validation_summary = "; ".join(validation_errors) if validation_errors else "Valid"
+            record.has_validation_errors = bool(validation_errors)
+    
+    @api.depends("state", "has_validation_errors", "draft_record_id", "type")
+    def _compute_can_submit(self):
+        """Compute whether the change request can be submitted."""
+        for record in self:
+            record.can_submit = (
+                record.state == "draft" and
+                not record.has_validation_errors and
+                record.type in ["create", "modify"] and
+                record.draft_record_id is not None
+            )
+    
+    @api.depends("state", "requester_id")
+    def _compute_can_approve(self):
+        """Compute whether the change request can be approved."""
+        for record in self:
+            user = self.env.user
+            record.can_approve = (
+                record.state == "submitted" and
+                user.has_group("g2p_change_management.group_change_approver")
+            )
+    
+    @api.depends("state", "requester_id")
+    def _compute_can_reject(self):
+        """Compute whether the change request can be rejected."""
+        for record in self:
+            user = self.env.user
+            record.can_reject = (
+                record.state == "submitted" and
+                user.has_group("g2p_change_management.group_change_approver")
+            )
+    
+    @api.constrains("name")
+    def _check_name_unique(self):
+        """Ensure change request names are unique."""
+        for record in self:
+            if record.name and record.name != "New":
+                existing = self.search([
+                    ("name", "=", record.name),
+                    ("id", "!=", record.id)
+                ])
+                if existing:
+                    raise ValidationError(
+                        "Change request name '%s' already exists. Please use a unique name." % record.name
+                    )
+    
+    @api.constrains("partner_id", "type", "state")
+    def _check_duplicate_active_requests(self):
+        """Prevent duplicate active change requests for the same partner."""
+        for record in self:
+            if record.partner_id and record.type in ["modify", "delete"]:
+                active_requests = self.search([
+                    ("partner_id", "=", record.partner_id.id),
+                    ("type", "in", ["modify", "delete"]),
+                    ("state", "in", ["draft", "submitted"]),
+                    ("id", "!=", record.id)
+                ])
+                if active_requests:
+                    raise ValidationError(
+                        "There is already an active change request for partner '%s'. Please complete or cancel the existing request first." % record.partner_id.name
+                    )
+    
+    @api.constrains("description")
+    def _check_description_content(self):
+        """Ensure description contains meaningful content."""
+        for record in self:
+            if record.description:
+                # Check for minimum meaningful content
+                clean_desc = record.description.strip()
+                if len(clean_desc) < 10:
+                    raise ValidationError(
+                        "Description must be at least 10 characters long to provide meaningful context."
+                    )
+                
+                # Check for repetitive characters
+                if len(set(clean_desc)) < 5:
+                    raise ValidationError(
+                        "Description must contain meaningful text, not repetitive characters."
+                    )
+    
+    def _validate_before_submit(self):
+        """Comprehensive validation before submitting a change request."""
+        self.ensure_one()
+        errors = []
+        
+        # Basic field validation - Description is optional but if provided, must be meaningful
+        if self.description and len(self.description.strip()) < 10:
+            errors.append("Description must be at least 10 characters long if provided")
+        
+        if self.type == "create":
+            if self.is_group and not self.group_kind_id:
+                errors.append("Group Kind is required for group creation requests")
+        
+        elif self.type in ["modify", "delete"]:
+            if not self.partner_id:
+                errors.append("Partner must be specified for modify/delete requests")
+            else:
+                # Check if partner is active
+                if not self.partner_id.active:
+                    errors.append("Cannot create change request for inactive partner")
+        
+        # Draft record validation
+        if self.type in ["create", "modify"] and not self.draft_record_id:
+            errors.append("Draft record must be created before submitting")
+        
+        # State validation
+        if self.state != "draft":
+            errors.append("Only draft change requests can be submitted")
+        
+        if errors:
+            raise ValidationError("Validation errors found:\n" + "\n".join("- " + error for error in errors))
+        
+        return True
+    
+    def _update_group_member_statuses(self, new_state):
+        """Update the status of all draft individual members in this group's change request."""
+        self.ensure_one()
+        
+        if not self.draft_record_id or not self.draft_record_id.is_group:
+            return 0
+        
+        # Get draft members from the group's draft record
+        draft_record = self.draft_record_id
+        if not draft_record.group_member_ids_json:
+            return 0
+        
+        try:
+            import json
+            member_data = json.loads(draft_record.group_member_ids_json)
+            updated_count = 0
+            
+            for member in member_data:
+                if member.get('draft_id'):
+                    # This is a draft individual record
+                    draft_individual = self.env["draft.record"].browse(member['draft_id'])
+                    if draft_individual.exists():
+                        # Since we removed state from draft.record, we just log the update
+                        updated_count += 1
+                        _logger.info("Updated draft individual %s (state management moved to Change Request)", draft_individual.name)
+            
+            return updated_count
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            _logger.error("Error updating group member statuses: %s", str(e))
+            return 0
+    
+    def _get_group_member_info(self):
+        """Get information about draft members in the group."""
+        self.ensure_one()
+        
+        if not self.draft_record_id or not self.draft_record_id.is_group:
+            return {'count': 0, 'names': ''}
+        
+        draft_record = self.draft_record_id
+        if not draft_record.group_member_ids_json:
+            return {'count': 0, 'names': ''}
+        
+        try:
+            import json
+            member_data = json.loads(draft_record.group_member_ids_json)
+            draft_members = []
+            
+            for member in member_data:
+                if member.get('draft_id'):
+                    draft_individual = self.env["draft.record"].browse(member['draft_id'])
+                    if draft_individual.exists():
+                        draft_members.append(draft_individual.name)
+            
+            return {
+                'count': len(draft_members),
+                'names': '\n'.join(draft_members) if draft_members else 'No draft members found'
+            }
+            
+        except (json.JSONDecodeError, KeyError):
+            return {'count': 0, 'names': 'Error reading member data'}
 
     def action_submit(self):
         """Submit the change request for approval."""
         self.ensure_one()
         
-        # Validate state
-        if self.state != "draft":
-            raise UserError("Only draft change requests can be submitted.")
+        # Check if this is a group request with draft members that need confirmation
+        if (self.draft_record_id and self.draft_record_id.is_group and 
+            not self.env.context.get('group_member_confirmed')):
+            
+            # Check if there are draft members to update
+            member_info = self._get_group_member_info()
+            if member_info.get('count', 0) > 0:
+                # Show confirmation wizard
+                return {
+                    'name': 'Group Member Status Update',
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'group.member.confirmation.wizard',
+                    'view_mode': 'form',
+                    'target': 'new',
+                    'context': {
+                        'active_id': self.id,
+                        'action_type': 'submit',
+                    }
+                }
         
-        # Validate required fields
-        if not self.description:
-            raise UserError("Description is required before submitting.")
-        
-        # Validate that draft record exists for create and modify requests
-        if self.type in ["create", "modify"] and not self.draft_record_id:
-            raise UserError("Draft record must be created before submitting.")
+        # Comprehensive validation before submission
+        self._validate_before_submit()
         
         # Validate approvers exist
         approvers = self.env["res.users"].search([
@@ -318,12 +664,17 @@ class ChangeRequest(models.Model):
             subject="Change Request Submitted: %s" % self.name,
         )
         
-        # Sync draft record state if it exists
-        if self.draft_record_id:
-            self._sync_draft_record_state()
-        
         # Create activity for approvers
         self._create_approval_activity()
+        
+        # Update group member statuses if this is a group request
+        if self.draft_record_id and self.draft_record_id.is_group:
+            updated_count = self._update_group_member_statuses("submitted")
+            if updated_count > 0:
+                self.message_post(
+                    body="Updated status of %s draft individual members to 'submitted'." % updated_count,
+                    subject="Group Member Status Updated",
+                )
         
         _logger.info("Change request %s submitted for approval by %s", self.name, self.env.user.name)
         return True
@@ -352,10 +703,6 @@ class ChangeRequest(models.Model):
             subject="Change Request Approved: %s" % self.name,
         )
         
-        # Sync draft record state if it exists
-        if self.draft_record_id:
-            self._sync_draft_record_state()
-        
         # Implement the changes based on type
         try:
             self._implement_changes()
@@ -363,6 +710,15 @@ class ChangeRequest(models.Model):
         except Exception as e:
             _logger.error("Failed to implement changes for change request %s: %s", self.name, str(e))
             raise UserError("Failed to implement changes: %s" % str(e))
+        
+        # Update group member statuses if this is a group request
+        if self.draft_record_id and self.draft_record_id.is_group:
+            updated_count = self._update_group_member_statuses("approved")
+            if updated_count > 0:
+                self.message_post(
+                    body="Updated status of %s draft individual members to 'published'." % updated_count,
+                    subject="Group Member Status Updated",
+                )
         
         # Send notification to requester
         self._send_approval_result_notification("approved")
@@ -398,9 +754,14 @@ class ChangeRequest(models.Model):
             subject="Change Request Rejected: %s" % self.name,
         )
         
-        # Sync draft record state if it exists
-        if self.draft_record_id:
-            self._sync_draft_record_state()
+        # Update group member statuses if this is a group request
+        if self.draft_record_id and self.draft_record_id.is_group:
+            updated_count = self._update_group_member_statuses("rejected")
+            if updated_count > 0:
+                self.message_post(
+                    body="Updated status of %s draft individual members to 'rejected'." % updated_count,
+                    subject="Group Member Status Updated",
+                )
         
         # Send notification to requester
         self._send_approval_result_notification("rejected")
@@ -561,10 +922,17 @@ class ChangeRequest(models.Model):
         if self.type == "create":
             if self.draft_record_id:
                 # Publish the draft record to create a new partner
-                created_partner = self.draft_record_id.action_publish()
+                # Use force_write context to bypass write protection during publishing
+                created_partner = self.draft_record_id.with_context(force_write=True).action_publish()
                 if created_partner:
                     # Link the created partner to this change request
                     self.write({"partner_id": created_partner.id})
+                    # Update the change request name with the new partner name and unique_id
+                    unique_id = getattr(created_partner, 'unique_id', '')
+                    if unique_id:
+                        self.name = f"{created_partner.name} ({unique_id}) - CR #{self.id}"
+                    else:
+                        self.name = f"{created_partner.name} - CR #{self.id}"
                     self.message_post(
                         body="New partner '%s' has been created and published to the registry." % created_partner.name,
                         subject="Partner Created: %s" % created_partner.name,
@@ -574,9 +942,15 @@ class ChangeRequest(models.Model):
         elif self.type == "modify":
             if self.draft_record_id:
                 # For modify requests, we need to update the existing partner
-                # The draft record's action_publish will handle the modification
-                modified_partner = self.draft_record_id.action_publish()
+                # Use force_write context to bypass write protection during publishing
+                modified_partner = self.draft_record_id.with_context(force_write=True).action_publish()
                 if modified_partner:
+                    # Update the change request name with the updated partner name and unique_id
+                    unique_id = getattr(modified_partner, 'unique_id', '')
+                    if unique_id:
+                        self.name = f"{modified_partner.name} ({unique_id}) - CR #{self.id}"
+                    else:
+                        self.name = f"{modified_partner.name} - CR #{self.id}"
                     self.message_post(
                         body="Partner '%s' has been updated in the registry." % modified_partner.name,
                         subject="Partner Updated: %s" % modified_partner.name,
@@ -585,7 +959,8 @@ class ChangeRequest(models.Model):
         
         elif self.type == "delete":
             if self.partner_id:
-                self.partner_id.write({"active": False})
+                # Use force_write context to bypass write protection during deletion
+                self.partner_id.with_context(force_write=True).write({"active": False})
                 self.message_post(body="Partner '%s' has been deactivated." % self.partner_id.name)
 
 
@@ -599,7 +974,7 @@ class ChangeRequest(models.Model):
         if self.type == "create":
             # For create requests, use the is_group field from change request
             draft_data = {
-                "name": f"New {self.type.title()} Request",
+                "name": f"New {'Group' if self.is_group else 'Individual'} - {self.id}",
                 "is_group": self.is_group,  # Use the user's selection
             }
             
@@ -623,6 +998,13 @@ class ChangeRequest(models.Model):
             if not self.partner_id:
                 raise UserError("Partner must be specified for modify requests.")
             
+            # Get region value safely - convert Many2one to ID if it exists
+            region_value = getattr(self.partner_id, "region", "")
+            if hasattr(region_value, 'id'):
+                region_value = region_value.id
+            elif not region_value:
+                region_value = ""
+            
             draft_data = {
                 "name": self.partner_id.name,
                 "is_group": self.partner_id.is_group,
@@ -631,7 +1013,7 @@ class ChangeRequest(models.Model):
                 "addl_name": getattr(self.partner_id, "addl_name", ""),
                 "phone": self.partner_id.phone if hasattr(self.partner_id, "phone") else "",
                 "gender": getattr(self.partner_id, "gender", ""),
-                "region": getattr(self.partner_id, "region", ""),
+                "region": region_value,
             }
             _logger.info(f"Modify request draft data: {draft_data}")
         
@@ -661,9 +1043,17 @@ class ChangeRequest(models.Model):
         
         # Use the draft record's existing action methods
         if self.draft_record_id.is_group:
-            return self.draft_record_id.action_open_group_wizard_view_only()
+            action = self.draft_record_id.action_open_group_wizard_view_only()
         else:
-            return self.draft_record_id.action_open_individual_wizard_view_only()
+            action = self.draft_record_id.action_open_individual_wizard_view_only()
+        
+        # Add change request context for filtering
+        if action and 'context' in action:
+            action['context'].update({
+                'change_request_context': True,
+            })
+        
+        return action
 
     def action_edit_draft_record(self):
         """Open the draft record in edit mode using existing draft record methods."""
@@ -683,6 +1073,7 @@ class ChangeRequest(models.Model):
             action['context'].update({
                 'active_model': 'draft.record',
                 'active_id': self.draft_record_id.id,
+                'change_request_context': True,  # Add change request context for filtering
             })
         
         return action
@@ -758,25 +1149,7 @@ class ChangeRequest(models.Model):
 
 
 
-    def _sync_draft_record_state(self):
-        """Synchronize draft record state with change request state."""
-        self.ensure_one()
-        
-        if not self.draft_record_id:
-            return
-        
-        # Map change request states to draft record states
-        state_mapping = {
-            "draft": "draft",
-            "submitted": "submitted", 
-            "approved": "published",  # draft.record uses 'published' instead of 'approved'
-            "rejected": "rejected",
-        }
-        
-        target_state = state_mapping.get(self.state)
-        if target_state and self.draft_record_id.state != target_state:
-            self.draft_record_id.write({"state": target_state})
-            _logger.info(f"Draft record {self.draft_record_id.name} state synced to {target_state}")
+
 
     def _return_wizard_with_context(self, view_id):
         """Return wizard action with proper context for partner form."""
@@ -870,3 +1243,46 @@ class ChangeRequest(models.Model):
                 context_data[f"default_{field_name}"] = field_value
 
         return context_data, additional_g2p_info
+
+    # ==================== BULK OPERATIONS ====================
+    
+    def action_bulk_approve(self):
+        """Open bulk approval wizard"""
+        return self._open_bulk_wizard('approve')
+    
+    def action_bulk_reject(self):
+        """Open bulk rejection wizard"""
+        return self._open_bulk_wizard('reject')
+    
+    def action_bulk_submit(self):
+        """Open bulk submission wizard"""
+        return self._open_bulk_wizard('submit')
+    
+    def action_bulk_cancel(self):
+        """Open bulk cancellation wizard"""
+        return self._open_bulk_wizard('cancel')
+    
+    def action_bulk_assign(self):
+        """Open bulk assignment wizard"""
+        return self._open_bulk_wizard('assign')
+    
+    def _open_bulk_wizard(self, operation_type):
+        """Open the bulk operations wizard"""
+        if not self:
+            raise UserError(_("No change requests selected for bulk operation."))
+        
+        # Validate that all selected records are change requests
+        if not all(record._name == 'change.request' for record in self):
+            raise UserError(_("All selected records must be change requests."))
+        
+        return {
+            'type': 'ir.actions.act_window',
+            'name': f'Bulk {operation_type.title()}',
+            'res_model': 'change.request.bulk.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_ids': self.ids,
+                'operation_type': operation_type,
+            }
+        }

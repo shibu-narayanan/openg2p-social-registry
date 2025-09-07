@@ -5,11 +5,46 @@
         <field name="name">res.partner.form.change.management</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="g2p_registry_group.view_groups_form"/>
-        <field name="priority">100</field>
+        <field name="priority">300</field>
         <field name="arch" type="xml">
+            <!-- Add Change Management button in button box -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button type="object" name="action_create_change_request" 
+                        class="oe_stat_button" icon="fa-edit"
+                        invisible="not is_registrant or has_active_draft"
+                        title="Create Change Request">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Create Change Request</span>
+                    </div>
+                </button>
+                <button type="object" name="action_view_active_change_request" 
+                        class="oe_stat_button" icon="fa-tasks"
+                        invisible="not has_active_draft"
+                        title="View Active Change Request">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Active Change Request</span>
+                    </div>
+                </button>
+            </xpath>
+            
+            <!-- Add active change request flag at the top of the sheet -->
+            <xpath expr="//sheet" position="inside">
+                <div class="alert alert-info" role="alert" invisible="not has_active_draft">
+                    <strong>Active Change Request:</strong> This record has an active change request. 
+                    <button type="object" name="action_view_active_change_request" class="btn btn-link">
+                        View Change Request
+                    </button>
+                </div>
+            </xpath>
+            
+            <!-- Make fields read-only for registrants when not in change request context -->
+            <xpath expr="//field" position="attributes">
+                <attribute name="readonly">is_registrant and not context.get('change_request_context', False)</attribute>
+            </xpath>
+            
             <!-- Add required fields for visibility logic -->
             <xpath expr="//sheet" position="inside">
-                <group string="Debug Info" invisible="0">
+                <group string="Debug Info" invisible="1">
                     <field name="has_active_draft"/>
                     <field name="active_change_request_id"/>
                     <field name="is_group"/>
@@ -17,42 +52,42 @@
                 </group>
             </xpath>
             
-            <!-- Add Published Members title before the existing members list -->
-            <xpath expr="//field[@name='group_membership_ids']" position="before">
-                <group string="Published Members" name="published_members_title"/>
-            </xpath>
+
             
-            <!-- Add Draft Members section to Members page -->
-            <xpath expr="//page[@name='members']" position="inside">
-                <!-- Draft Members Section - Only show for groups with active drafts -->
-                <group string="Draft Members" name="draft_members" 
-                       invisible="0">
-                    
-                    <!-- Active Change Request Info -->
-                    <group string="Change Request Info" invisible="not active_change_request_id">
-                        <field name="active_change_request_id" readonly="1"/>
-                    </group>
-                    
-                    <!-- Draft Members List (Editable like existing members) -->
-                    <field name="draft_member_ids" readonly="disabled" nolabel="1" colspan="4">
-                        <tree editable="top" default_order="name asc">
+
+            
+
+        </field>
+    </record>
+
+    <!-- Draft Group View for Change Management Context -->
+    <!-- Add Draft Members section to the published partner's Members tab -->
+    <record id="view_partner_form_draft_members" model="ir.ui.view">
+        <field name="name">res.partner.form.draft.members</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="g2p_registry_group.view_groups_form"/>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <!-- Add Draft Members section within the existing Members tab -->
+            <xpath expr="//page[@name='members']//field[@name='group_membership_ids']" position="after">
+                <group string="Draft Members" col="1" invisible="not context.get('change_request_context', False)">
+                    <field name="draft_member_ids" nolabel="1">
+                        <tree editable="top" default_order="name asc" create="true" delete="true">
+                            <button
+                                name="action_open_individual_wizard"
+                                type="object"
+                                icon="fa-external-link"
+                                class="btn-success"
+                                title="Open Individual Form"
+                            />
                             <field name="name" string="Member Name" />
-                            <field name="gender" string="Gender" />
+                            <field name="given_name" string="Given Name" />
+                            <field name="family_name" string="Family Name" />
                             <field name="phone" string="Phone" />
+                            <field name="gender" string="Gender" />
                             <field name="region" string="Region" />
                         </tree>
                     </field>
-                </group>
-            </xpath>
-            
-            <!-- Add Change Request button to form -->
-            <xpath expr="//sheet" position="inside">
-                <group string="Change Management" invisible="not is_registrant">
-                    <button name="action_create_change_request" 
-                            string="Create Change Request" 
-                            type="object" 
-                            class="btn-primary"
-                            invisible="has_active_draft"/>
                 </group>
             </xpath>
         </field>
@@ -65,23 +100,47 @@
         <field name="inherit_id" ref="g2p_registry_individual.view_individuals_form"/>
         <field name="priority">100</field>
         <field name="arch" type="xml">
+            <!-- Add Change Management button in button box -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button type="object" name="action_create_change_request" 
+                        class="oe_stat_button" icon="fa-edit"
+                        invisible="not is_registrant or has_active_draft"
+                        title="Create Change Request">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Create Change Request</span>
+                    </div>
+                </button>
+                <button type="object" name="action_view_active_change_request" 
+                        class="oe_stat_button" icon="fa-tasks"
+                        invisible="not has_active_draft"
+                        title="View Active Change Request">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Active Change Request</span>
+                    </div>
+                </button>
+            </xpath>
+            
+            <!-- Add active change request flag at the top of the sheet -->
+            <xpath expr="//sheet" position="inside">
+                <div class="alert alert-info" role="alert" invisible="not has_active_draft">
+                    <strong>Active Change Request:</strong> This record has an active change request. 
+                    <button type="object" name="action_view_active_change_request" class="btn btn-link">
+                        View Change Request
+                    </button>
+                </div>
+            </xpath>
+            
+            <!-- Make fields read-only for registrants when not in change request context -->
+            <xpath expr="//field" position="attributes">
+                <attribute name="readonly">is_registrant and not context.get('change_request_context', False)</attribute>
+            </xpath>
+            
             <!-- Add required fields for visibility logic -->
             <xpath expr="//sheet" position="inside">
-                <group string="Debug Info" invisible="0">
+                <group string="Debug Info" invisible="1">
                     <field name="has_active_draft"/>
                     <field name="active_change_request_id"/>
                     <field name="is_registrant"/>
-                </group>
-            </xpath>
-            
-            <!-- Add Change Request button to form -->
-            <xpath expr="//sheet" position="inside">
-                <group string="Change Management" invisible="not is_registrant">
-                    <button name="action_create_change_request" 
-                            string="Create Change Request" 
-                            type="object" 
-                            class="btn-primary"
-                            invisible="has_active_draft"/>
                 </group>
             </xpath>
         </field>

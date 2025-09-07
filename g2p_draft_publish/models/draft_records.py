@@ -41,18 +41,134 @@ class G2PDraftRecord(models.Model):
     region = fields.Char()
     is_group = fields.Boolean(default=False)
     partner_data = fields.Json(string="Partner Data (JSON)")
-    state = fields.Selection(
-        selection=[
-            ("draft", "Draft"),
-            ("submitted", "Submitted"),
-            ("published", "Published"),
-            ("rejected", "Rejected"),
-        ],
-        default="draft",
-    )
+
     rejection_reason = fields.Text("remark")
 
     group_member_ids_json = fields.Json(string="Group Members (JSON)", default=list)
+    
+    @api.model
+    def _name_search(self, name, args=None, operator='ilike', limit=100, name_get_uid=None):
+        """Override name search to filter by group type and Change Request states when in member selection context."""
+        args = args or []
+        
+        # Check if we're in a member selection context (from change request or group wizard)
+        if self.env.context.get('member_selection_context') or self.env.context.get('change_request_context'):
+            args += [
+                ("is_group", "=", False)
+            ]
+            
+            # Get all individual draft records
+            draft_records = self.env["draft.record"].search(args)
+            
+            # Filter based on Change Request states
+            allowed_states = ['draft', 'submitted']
+            filtered_records = self.env["draft.record"]
+            
+            for draft_record in draft_records:
+                # Check if this draft record has any Change Requests in allowed states
+                change_requests = self.env["change.request"].search([
+                    ("draft_record_id", "=", draft_record.id),
+                    ("state", "in", allowed_states)
+                ])
+                
+                # If no Change Request exists or if it's in an allowed state, include it
+                if not change_requests.exists() or any(cr.state in allowed_states for cr in change_requests):
+                    filtered_records |= draft_record
+            
+            # Apply name search on filtered records
+            if name:
+                filtered_records = filtered_records.filtered(lambda r: name.lower() in r.name.lower())
+            
+            return filtered_records.ids[:limit]
+        
+        return super()._name_search(name, args, operator, limit, name_get_uid)
+    
+    def name_get(self):
+        """Override name_get to filter by group type and Change Request states when in member selection context."""
+        if self.env.context.get('member_selection_context') or self.env.context.get('change_request_context'):
+            # Filter records to only show individual records (not groups)
+            filtered_records = self.filtered(lambda r: not r.is_group)
+            
+            # Further filter based on Change Request states
+            allowed_states = ['draft', 'submitted']
+            final_filtered_records = self.env["draft.record"]
+            
+            for draft_record in filtered_records:
+                # Check if this draft record has any Change Requests in allowed states
+                change_requests = self.env["change.request"].search([
+                    ("draft_record_id", "=", draft_record.id),
+                    ("state", "in", allowed_states)
+                ])
+                
+                # If no Change Request exists or if it's in an allowed state, include it
+                if not change_requests.exists() or any(cr.state in allowed_states for cr in change_requests):
+                    final_filtered_records |= draft_record
+            
+            # Add Change Request state information to the display name
+            result = []
+            for record in final_filtered_records:
+                # Find the most recent Change Request for this draft record
+                change_request = self.env["change.request"].search([
+                    ("draft_record_id", "=", record.id)
+                ], order="create_date desc", limit=1)
+                
+                if change_request:
+                    display_name = f"{record.name} (CR: {change_request.state})"
+                else:
+                    display_name = f"{record.name} (No CR)"
+                
+                result.append((record.id, display_name))
+            
+            return result
+        
+        return super().name_get()
+    
+    # Temporarily disabled search override to avoid registry issues
+    # @api.model
+    # def search(self, args, offset=0, limit=None, order=None, count=False):
+    #     """Override search to filter by group type and Change Request states when in member selection context."""
+    #     # Only apply custom filtering in specific contexts and when change.request model is available
+    #     if (self.env.context.get('member_selection_context') or self.env.context.get('change_request_context')) and 'change.request' in self.env:
+    #         try:
+    #             # Add filtering for member selection
+    #             args = args or []
+    #             args += [
+    #                 ("is_group", "=", False)
+    #             ]
+    #             
+    #             # Use super().search to avoid recursion
+    #             draft_records = super().search(args)
+    #             
+    #             # Filter based on Change Request states
+    #             allowed_states = ['draft', 'submitted']
+    #             filtered_records = self.env["draft.record"]
+    #             
+    #             for draft_record in draft_records:
+    #                 # Check if this draft record has any Change Requests in allowed states
+    #                 change_requests = self.env["change.request"].search([
+    #                     ("draft_record_id", "=", draft_record.id),
+    #                     ("state", "in", allowed_states)
+    #                 ])
+    #                 
+    #                 # If no Change Request exists or if it's in an allowed state, include it
+    #                 if not change_requests.exists() or any(cr.state in allowed_states for cr in change_requests):
+    #                     filtered_records |= draft_record
+    #             
+    #             if count:
+    #                 return len(filtered_records)
+    #             
+    #             # Apply offset and limit
+    #             if offset:
+    #                 filtered_records = filtered_records[offset:]
+    #             if limit:
+    #                 filtered_records = filtered_records[:limit]
+    #             
+    #             return filtered_records.ids
+    #         except Exception:
+    #             # If there's any error (e.g., during registry loading), fall back to normal search
+    #             pass
+    #     
+    #     return super().search(args, offset, limit, order, count)
 
     @api.model
     def create(self, vals):
@@ -140,7 +256,7 @@ class G2PDraftRecord(models.Model):
                         }
                     )
 
-        self.write({"state": "published"})
+
         self._notify_validators()
         return created_partner
 
@@ -224,7 +340,7 @@ class G2PDraftRecord(models.Model):
                 individual_draft_ids = record.group_member_ids_json or []
                 for draft_id in individual_draft_ids:
                     draft_individual = self.env["draft.record"].browse(draft_id)
-                    if draft_individual.exists() and draft_individual.state == "draft":
+                    if draft_individual.exists():
                         draft_individual.action_submit()
 
             self.write({"state": "submitted", "partner_data": json.dumps(partner_data)})
@@ -456,26 +572,30 @@ class G2PRespartnerIntegration(models.Model):
 
         if update_vals:  # Only write if there are valid fields to update
             active_record.write(update_vals)
+        
+        # Update change request name when draft record is saved for the first time
+        change_requests = self.env["change.request"].search([
+            ("draft_record_id", "=", active_record.id)
+        ])
+        if change_requests:
+            for cr in change_requests:
+                # Update with draft record name (without unique_id since it's not published yet)
+                if active_record.name:
+                    cr.name = f"{active_record.name} - CR #{cr.id}"
 
     def action_publish(self):
         context = self.env.context
         model_name = context.get("active_model")
         record_id = context.get("active_id")
         record = self.env[model_name].browse(record_id)
-        if record.state == "published":
-            raise ValidationError(_("Record already has been published"))
-        else:
-            record.action_publish()
+        record.action_publish()
 
     def action_submit(self):
         context = self.env.context
         model_name = context.get("active_model")
         record_id = context.get("active_id")
         record = self.env[model_name].browse(record_id)
-        if record.state == "submitted":
-            raise ValidationError(_("Record already has been Submitted"))
-        else:
-            record.action_submit()
+        record.action_submit()
 
     def get_fields_in_view(self):
         views = self.env["ir.ui.view"].search(
@@ -507,3 +627,17 @@ class G2PRespartnerIntegration(models.Model):
         usable_fields = all_fields_in_model.intersection(fields_in_view)
 
         return usable_fields
+
+    def write(self, vals):
+        """Override write to update change request names when draft record is updated."""
+        result = super().write(vals)
+        
+        # Update change request names if draft record name changed
+        if 'name' in vals:
+            change_requests = self.env["change.request"].search([
+                ("draft_record_id", "in", self.ids)
+            ])
+            if change_requests:
+                change_requests.update_name_from_partner()
+        
+        return result

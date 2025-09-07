@@ -11,46 +11,17 @@
                 <field name="gender" />
                 <field name="region" />
                 <field name="is_group" column_invisible="1" />
-                <field
-                    name="state"
-                    widget="badge"
-                    decoration-warning="state == 'draft'"
-                    decoration-success="state == 'published'"
-                />
                 <button
                     string="View"
-                    invisible="state != 'published'"
                     type="object"
                     name="action_open_individual_wizard_view_only"
                     groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin,g2p_draft_publish.group_int_approver"
                 />
                 <button
                     string="Edit"
-                    invisible="state == 'published'"
                     type="object"
                     name="action_open_individual_wizard"
                     groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin,g2p_draft_publish.group_int_approver"
-                />
-                <button
-                    string="Submit"
-                    invisible="state != 'draft'"
-                    type="object"
-                    name="action_submit"
-                    groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin"
-                />
-                <button
-                    string="Publish"
-                    invisible="state != 'submitted'"
-                    type="object"
-                    name="action_publish"
-                    groups="g2p_draft_publish.group_int_approver,g2p_draft_publish.group_int_admin"
-                />
-                <button
-                    string="Reject"
-                    invisible="state!='submitted'"
-                    type="object"
-                    name="action_reject"
-                    groups="g2p_draft_publish.group_int_approver,g2p_draft_publish.group_int_admin"
                 />
             </tree>
         </field>
@@ -65,25 +36,17 @@
                 <field name="phone" />
                 <field name="region" />
                 <field name="is_group" column_invisible="1" />
-                <field
-                    name="state"
-                    widget="badge"
-                    decoration-warning="state == 'draft'"
-                    decoration-success="state == 'published'"
-                />
                 <button
                     string="Add Members"
-                    invisible="state == 'published'"
                     type="action"
                     name="%(action_draft_group_add_members_wizard)d"
                     class="btn-link"
                     icon="fa-users"
                     groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin,g2p_draft_publish.group_int_approver"
-                    context="{'default_group_id': active_id}"
+                    context="{'default_group_id': active_id, 'change_request_context': context.get('change_request_context', False)}"
                 />
                 <button
                     string="View Members"
-                    invisible="state != 'published'"
                     type="action"
                     name="%(action_draft_group_view_members_wizard)d"
                     class="btn-link"
@@ -93,38 +56,15 @@
                 />
                 <button
                     string="View"
-                    invisible="state != 'published'"
                     type="object"
                     name="action_open_group_wizard_view_only"
                     groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin,g2p_draft_publish.group_int_approver"
                 />
                 <button
                     string="Edit"
-                    invisible="state == 'published'"
                     type="object"
                     name="action_open_group_wizard"
                     groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin,g2p_draft_publish.group_int_approver"
-                />
-                <button
-                    string="Submit"
-                    invisible="state != 'draft'"
-                    type="object"
-                    name="action_submit"
-                    groups="g2p_draft_publish.group_int_validator,g2p_draft_publish.group_int_admin"
-                />
-                <button
-                    string="Publish"
-                    invisible="state != 'submitted'"
-                    type="object"
-                    name="action_publish"
-                    groups="g2p_draft_publish.group_int_approver,g2p_draft_publish.group_int_admin"
-                />
-                <button
-                    string="Reject"
-                    invisible="state!='submitted'"
-                    type="object"
-                    name="action_reject"
-                    groups="g2p_draft_publish.group_int_approver,g2p_draft_publish.group_int_admin"
                 />
             </tree>
         </field>
@@ -136,7 +76,6 @@
         <field name="arch" type="xml">
             <form string="Individual Draft Record">
                 <header>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,published" />
                 </header>
                 <sheet>
                     <group>
@@ -164,7 +103,6 @@
         <field name="arch" type="xml">
             <form string="Group Draft Record">
                 <header>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,published" />
                 </header>
                 <sheet>
                     <group>
@@ -193,7 +131,7 @@
                 <footer>
                     <button class="btn btn-info" name="action_update" string="Save" type="object" />
                     <button string="Discard" class="btn btn-warning" special="cancel" data-hotkey="x" />
-                    <button
+                    <!-- <button
                         class="btn btn-success"
                         name="action_submit"
                         string="Submit"
@@ -206,7 +144,7 @@
                         string="Publish"
                         type="object"
                         groups="g2p_draft_publish.group_int_approver,g2p_draft_publish.group_int_admin"
-                    />
+                    /> -->
                     <field name="imported_record_state" invisible="true" />
                 </footer>
             </xpath>
@@ -223,7 +161,7 @@
                 <footer>
                     <button class="btn btn-info" name="action_update" string="Save" type="object" />
                     <button string="Discard" class="btn btn-warning" special="cancel" data-hotkey="x" />
-                    <button
+                    <!-- <button
                         class="btn btn-success"
                         name="action_submit"
                         string="Submit"
@@ -236,7 +174,7 @@
                         string="Publish"
                         type="object"
                         groups="g2p_draft_publish.group_int_approver,g2p_draft_publish.group_int_admin"
-                    />
+                    /> -->
                     <field name="imported_record_state" invisible="true" />
                 </footer>
             </xpath>
@@ -333,7 +271,7 @@
         <field name="name">Group Draft</field>
         <field name="res_model">draft.record</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[('state', '!=', 'submitted'), ('is_group', '=', True)]</field>
+        <field name="domain">[('is_group', '=', True)]</field>
         <field
             name="view_ids"
             eval="[(5, 0, 0),
@@ -349,13 +287,7 @@
         <field name="name">Submitted Group</field>
         <field name="res_model">draft.record</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[
-            '&amp;',
-            ('is_group', '=', True),
-            '|',
-            ('state', '=', 'submitted'),
-            ('state', '=', 'published')
-        ]</field>
+        <field name="domain">[('is_group', '=', True)]</field>
         <field
             name="view_ids"
             eval="[(5, 0, 0),
@@ -369,7 +301,7 @@
         <field name="name">Individual Draft</field>
         <field name="res_model">draft.record</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[('state', '!=', 'submitted'), ('is_group', '=', False)]</field>
+        <field name="domain">[('is_group', '=', False)]</field>
         <field
             name="context"
         >{'default_is_registrant':True,'default_is_group':False,'registrant_form':True}</field>
@@ -385,13 +317,7 @@
         <field name="name">Submitted Individual</field>
         <field name="res_model">draft.record</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[
-            '&amp;',
-            ('is_group', '=', False),
-            '|',
-            ('state', '=', 'submitted'),
-            ('state', '=', 'published')
-        ]</field>
+        <field name="domain">[('is_group', '=', False)]</field>
         <field
             name="view_ids"
             eval="[(5, 0, 0),

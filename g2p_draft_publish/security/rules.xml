@@ -47,7 +47,7 @@
     <field name="model_id" ref="model_draft_record" />
     <field
             name="domain_force"
-        >[('state','in', ('draft','published', 'rejected')), '|', ('message_partner_ids', 'in', [user.partner_id.id]), ('message_partner_ids','=',False) ]</field>
+        >['|', ('message_partner_ids', 'in', [user.partner_id.id]), ('message_partner_ids','=',False) ]</field>
     <field
             name="groups"
             eval="[(6, 0, [ref('g2p_draft_publish.group_int_validator'), ref('g2p_draft_publish.group_int_approver')])]"
@@ -55,22 +55,10 @@
 </record>
 
 
-<record id="g2p_submitted_validator_record_following_restriction_rule_validator" model="ir.rule">
-    <field name="name">Submitted Records Follower User</field>
-    <field name="model_id" ref="model_draft_record" />
-    <field
-            name="domain_force"
-        >[('state','=', 'submitted'),'|', ('message_partner_ids', 'in', [user.partner_id.id]), ('message_partner_ids','=',False) ]</field>
-    <field name="groups" eval="[(6, 0, [ref('g2p_draft_publish.group_int_validator')])]" />
-</record>
 
 
-<record id="g2p_submitted_record_approver_following_restriction_rule" model="ir.rule">
-    <field name="name">Submitted Records Follower Draft Approver</field>
-    <field name="model_id" ref="model_draft_record" />
-    <field name="domain_force">[('state','=', 'submitted')]</field>
-    <field name="groups" eval="[(6, 0, [ref('g2p_draft_publish.group_int_approver' )])]" />
-</record>
+
+
 
 
 

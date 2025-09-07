@@ -18,6 +18,8 @@ class ResPartner(models.Model):
     # Computed field to check if group has active draft
     has_active_draft = fields.Boolean(
         compute="_compute_has_active_draft",
+        store=True,
+        index=True,
         string="Has Active Draft",
         help="True if this group has an active change request with draft",
     )
@@ -27,29 +29,37 @@ class ResPartner(models.Model):
         "change.request",
         compute="_compute_active_change_request",
         store=True,
+        index=True,
         search="_search_active_change_request",
         string="Active Change Request",
         help="Active change request for this partner",
     )
     
-    # Draft members field - will be managed through the draft record JSON
+    # Draft members field - Many2many for draft individual members
     draft_member_ids = fields.Many2many(
         "draft.record",
+        "partner_draft_member_rel",
+        "partner_id",
+        "draft_id",
         string="Draft Members",
-        help="Draft members from the active change request",
-        compute="_compute_draft_members",
-        store=False,
+        help="Draft individual members from new change requests (without partner_id)",
+        domain="[('is_group', '=', False)]",
     )
+    
+
 
     @api.depends("change_request_ids", "change_request_ids.state")
     def _compute_has_active_draft(self):
-        """Compute if partner has active change request."""
+        """Compute if partner has active change request with optimized logic."""
         for record in self:
-            active_crs = record.change_request_ids.filtered(
-                lambda cr: cr.state in ['draft', 'submitted']
+            # Use any() for better performance than filtered()
+            record.has_active_draft = any(
+                cr.state in ['draft', 'submitted'] 
+                for cr in record.change_request_ids
             )
-            record.has_active_draft = bool(active_crs)
     
+
+
     @api.depends("change_request_ids", "change_request_ids.state")
     def _compute_active_change_request(self):
         """Compute the active change request for this partner."""
@@ -58,7 +68,49 @@ class ResPartner(models.Model):
                 lambda cr: cr.state in ['draft', 'submitted']
             )
             record.active_change_request_id = active_crs[0] if active_crs else False
-    
+
+    @api.model
+    def create(self, vals):
+        """Override create to sync draft members to group_member_ids_json."""
+        record = super().create(vals)
+        if 'draft_member_ids' in vals:
+            record._sync_draft_members_to_json()
+        return record
+
+    def write(self, vals):
+        """Override write to sync draft members to group_member_ids_json."""
+        result = super().write(vals)
+        if 'draft_member_ids' in vals:
+            self._sync_draft_members_to_json()
+        return result
+
+    def _sync_draft_members_to_json(self):
+        """Sync draft_member_ids to group_member_ids_json in the active change request's draft record."""
+        for record in self:
+            if record.active_change_request_id and record.active_change_request_id.draft_record_id:
+                draft_record = record.active_change_request_id.draft_record_id
+                if draft_record.is_group:
+                    # Convert draft_member_ids to JSON format
+                    member_data = []
+                    for draft_member in record.draft_member_ids:
+                        member_data.append({
+                            'draft_id': draft_member.id,
+                            'name': draft_member.name,
+                            'given_name': getattr(draft_member, 'given_name', ''),
+                            'family_name': getattr(draft_member, 'family_name', ''),
+                            'phone': getattr(draft_member, 'phone', ''),
+                            'gender': getattr(draft_member, 'gender', ''),
+                            'region': getattr(draft_member, 'region', ''),
+                        })
+                    
+                    # Update the draft record's group_member_ids_json
+                    import json
+                    draft_record.write({
+                        'group_member_ids_json': json.dumps(member_data)
+                    })
+                    _logger.info("Synced %d draft members to group_member_ids_json for draft record %s", 
+                               len(member_data), draft_record.id)
+
     def _search_active_change_request(self, operator, value):
         """Search method for active_change_request_id field."""
         if operator == '=' and value:
@@ -78,34 +130,127 @@ class ResPartner(models.Model):
                 return [('change_request_ids', 'not in', active_crs.ids)]
         return []
     
-    @api.depends("active_change_request_id", "active_change_request_id.draft_record_id")
-    def _compute_draft_members(self):
-        """Compute draft members from the active change request's draft record."""
+    @api.constrains("change_request_ids")
+    def _check_change_request_consistency(self):
+        """Ensure change request consistency for this partner."""
         for record in self:
-            if record.active_change_request_id and record.active_change_request_id.draft_record_id:
-                # Get draft members from the draft record's JSON data
-                draft_record = record.active_change_request_id.draft_record_id
-                if draft_record.is_group and draft_record.group_member_ids_json:
-                    try:
-                        import json
-                        member_data = json.loads(draft_record.group_member_ids_json)
-                        # Get draft individual records from the JSON data
-                        draft_member_ids = []
-                        for member in member_data:
-                            if member.get('draft_id'):
-                                # This is a draft individual record ID
-                                draft_member_ids.append(member['draft_id'])
-                            elif member.get('id'):
-                                # This is an existing partner ID, we need to find/create draft record
-                                # For now, we'll skip existing partners and only show draft individuals
-                                continue
-                        record.draft_member_ids = self.env["draft.record"].browse(draft_member_ids)
-                    except (json.JSONDecodeError, KeyError):
-                        record.draft_member_ids = self.env["draft.record"].browse([])
-                else:
-                    record.draft_member_ids = self.env["draft.record"].browse([])
-            else:
-                record.draft_member_ids = self.env["draft.record"].browse([])
+            # Check for conflicting change requests
+            active_requests = record.change_request_ids.filtered(
+                lambda cr: cr.state in ['draft', 'submitted']
+            )
+            
+            # Group by type to check for conflicts
+            request_types = active_requests.mapped('type')
+            if len(request_types) != len(set(request_types)):
+                raise ValidationError(
+                    "Partner '%s' has multiple active change requests of the same type. Please resolve conflicts before proceeding." % record.name
+                )
+    
+    @api.constrains("active")
+    def _check_active_with_change_requests(self):
+        """Ensure partner cannot be deactivated if it has active change requests."""
+        for record in self:
+            if not record.active:
+                active_requests = record.change_request_ids.filtered(
+                    lambda cr: cr.state in ['draft', 'submitted']
+                )
+                if active_requests:
+                    raise ValidationError(
+                        "Cannot deactivate partner '%s' while it has active change requests. Please complete or cancel the change requests first." % record.name
+                    )
+    
+    def _validate_for_change_request(self, change_type):
+        """Validate partner for specific change request type."""
+        self.ensure_one()
+        errors = []
+        
+        if change_type == "modify":
+            # Check if partner is active
+            if not self.active:
+                errors.append("Cannot modify inactive partner")
+            
+            # Check for existing active modify requests
+            existing_modify = self.change_request_ids.filtered(
+                lambda cr: cr.type == "modify" and cr.state in ['draft', 'submitted']
+            )
+            if existing_modify:
+                errors.append("Partner already has an active modify request")
+        
+        elif change_type == "delete":
+            # Check if partner is active
+            if not self.active:
+                errors.append("Partner is already inactive")
+            
+            # Check for existing active delete requests
+            existing_delete = self.change_request_ids.filtered(
+                lambda cr: cr.type == "delete" and cr.state in ['draft', 'submitted']
+            )
+            if existing_delete:
+                errors.append("Partner already has an active delete request")
+        
+        if errors:
+            raise ValidationError("Validation errors for %s request:\n" % change_type + "\n".join("- " + error for error in errors))
+        
+        return True
+    
+    def get_available_draft_members(self):
+        """Get available draft individual records for group membership selection."""
+        self.ensure_one()
+        
+        # Only return draft records that are in draft or submitted state (not published/rejected)
+        available_drafts = self.env["draft.record"].search([
+            ("is_group", "=", False),  # Only individual records
+            ("state", "in", ["draft", "submitted"]),  # Only draft and submitted
+        ])
+        
+        return available_drafts
+    
+    def update_group_member_statuses(self, new_state):
+        """Update the status of all draft individual members in this group."""
+        self.ensure_one()
+        
+        if not self.is_group:
+            return False
+        
+        # Get the active change request for this group
+        active_cr = self.active_change_request_id
+        if not active_cr or not active_cr.draft_record_id:
+            return False
+        
+        # Get draft members from the group's draft record
+        draft_record = active_cr.draft_record_id
+        if not draft_record.group_member_ids_json:
+            return False
+        
+        try:
+            import json
+            member_data = json.loads(draft_record.group_member_ids_json)
+            updated_count = 0
+            
+            for member in member_data:
+                if member.get('draft_id'):
+                    # This is a draft individual record
+                    draft_individual = self.env["draft.record"].browse(member['draft_id'])
+                    if draft_individual.exists() and draft_individual.state in ["draft", "submitted"]:
+                        # Map change request states to draft record states
+                        state_mapping = {
+                            "submitted": "submitted",
+                            "approved": "published",  # draft.record uses 'published' instead of 'approved'
+                            "rejected": "rejected",
+                        }
+                        target_state = state_mapping.get(new_state)
+                        if target_state:
+                            draft_individual.write({"state": target_state})
+                            updated_count += 1
+                            _logger.info("Updated draft individual %s state to %s", draft_individual.name, target_state)
+            
+            return updated_count
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            _logger.error("Error updating group member statuses: %s", str(e))
+            return False
+    
+
     
 
 
@@ -144,11 +289,57 @@ class ResPartner(models.Model):
             "target": "current",
         }
 
+    def action_view_active_change_request(self):
+        """View the active change request for this partner."""
+        self.ensure_one()
+        
+        if not self.has_active_draft:
+            raise UserError(_("No active change request found for this partner."))
+        
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Active Change Request"),
+            "res_model": "change.request",
+            "res_id": self.active_change_request_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_add_draft_members(self):
+        """Open the draft member selection wizard for this partner's active change request."""
+        self.ensure_one()
+        
+        if not self.active_change_request_id or not self.active_change_request_id.draft_record_id:
+            raise UserError(_("No active change request with draft record found for this partner."))
+        
+        if not self.active_change_request_id.draft_record_id.is_group:
+            raise UserError(_("Draft member selection is only available for group partners."))
+        
+        # Open the draft member selection wizard
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Add Draft Members"),
+            "res_model": "draft.group.add.members.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_group_id": self.active_change_request_id.draft_record_id.id,
+                "member_selection_context": True,
+            },
+        }
+
     def _create_draft_from_partner(self):
         """Create a draft record by copying partner data."""
         self.ensure_one()
         
         # Prepare partner data for draft record
+        # Get region value safely - convert Many2one to ID if it exists
+        region_value = getattr(self, "region", "")
+        if hasattr(region_value, 'id'):
+            region_value = region_value.id
+        elif not region_value:
+            region_value = ""
+        
         partner_data = {
             "name": self.name,
             "is_group": self.is_group,
@@ -157,7 +348,7 @@ class ResPartner(models.Model):
             "addl_name": getattr(self, "addl_name", ""),
             "phone": self.phone if hasattr(self, "phone") else "",
             "gender": getattr(self, "gender", ""),
-            "region": getattr(self, "region", ""),
+            "region": region_value,
         }
         
         # Create draft record
@@ -166,14 +357,27 @@ class ResPartner(models.Model):
         return draft_record
 
     def write(self, vals):
-        """Override write to prevent direct modification if there's an active change request."""
-        for partner in self:
-            if partner.has_active_draft and not self.env.context.get("force_write"):
-                raise ValidationError(
-                    _("Cannot modify partner '%s' directly. Please use the Change Request workflow.")
-                    % partner.name
-                )
-        return super().write(vals)
+        """Override write to prevent direct modification when change management is enabled."""
+        # Always allow writes in these scenarios to preserve original behavior:
+        # 1. System operations (install, upgrade, etc.)
+        # 2. Change request context (editing draft records)
+        # 3. Force write context (explicit bypass)
+        # 4. Non-registrant partners (regular business partners)
+        # 5. When change management is disabled
+        
+        if (self.env.context.get("change_request_context") or 
+            self.env.context.get("force_write") or
+            self.env.context.get("install_mode") or
+            self.env.context.get("upgrade_mode") or
+            not self.env.context.get("change_management_enabled", True) or
+            not any(partner.is_registrant for partner in self)):
+            return super().write(vals)
+        
+        # Only block writes for registrant partners when change management is enabled
+        # and not in change request context
+        raise ValidationError(
+            _("Cannot modify registrant records directly. Please use the Change Request workflow to make changes.")
+        )
 
 
     
