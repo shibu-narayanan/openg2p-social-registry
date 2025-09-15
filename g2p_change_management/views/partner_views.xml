@@ -69,9 +69,9 @@
         <field name="priority">200</field>
         <field name="arch" type="xml">
             <!-- Add Draft Members section within the existing Members tab -->
-            <xpath expr="//page[@name='members']//field[@name='group_membership_ids']" position="after">
-                <group string="Draft Members" col="1" invisible="not context.get('change_request_context', False)">
-                    <field name="draft_member_ids" nolabel="1">
+            <xpath expr="//page[@name='members']" position="inside">
+                <group string="Draft Members" col="1" colspan="4" invisible="not context.get('change_request_context', False)">
+                    <field name="draft_member_ids" nolabel="1" colspan="4">
                         <tree editable="top" default_order="name asc" create="true" delete="true">
                             <button
                                 name="action_open_individual_wizard"

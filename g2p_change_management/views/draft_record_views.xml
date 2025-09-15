@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit the draft record group form view to add members section -->
+    <record id="view_draft_record_group_form_members" model="ir.ui.view">
+        <field name="name">draft.record.group.form.members</field>
+        <field name="model">draft.record</field>
+        <field name="inherit_id" ref="g2p_draft_publish.view_draft_imported_group_form"/>
+        <field name="arch" type="xml">
+            <!-- Add Members tab before Partner Data tab -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Members" name="members">
+                    <field name="draft_member_ids" nolabel="1">
+                        <tree editable="top" default_order="name asc" create="true" delete="true">
+                            <field name="name" string="Member Name" />
+                            <field name="given_name" string="Given Name" />
+                            <field name="family_name" string="Family Name" />
+                            <field name="phone" string="Phone" />
+                            <field name="gender" string="Gender" />
+                            <field name="region" string="Region" />
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
