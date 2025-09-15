@@ -921,12 +921,24 @@ class ChangeRequest(models.Model):
         
         if self.type == "create":
             if self.draft_record_id:
+                # Capture new values from draft record before publishing
+                new_values = self._get_draft_record_values()
+                
                 # Publish the draft record to create a new partner
                 # Use force_write context to bypass write protection during publishing
                 created_partner = self.draft_record_id.with_context(force_write=True).action_publish()
                 if created_partner:
                     # Link the created partner to this change request
                     self.write({"partner_id": created_partner.id})
+                    
+                    # Create change log entry for creation
+                    self.env["change.log"].create_change_log(
+                        change_request=self,
+                        partner=created_partner,
+                        change_type="create",
+                        new_values=new_values
+                    )
+                    
                     # Update the change request name with the new partner name and unique_id
                     unique_id = getattr(created_partner, 'unique_id', '')
                     if unique_id:
@@ -940,30 +952,163 @@ class ChangeRequest(models.Model):
                     _logger.info("Partner created successfully: %s (ID: %s)", created_partner.name, created_partner.id)
         
         elif self.type == "modify":
-            if self.draft_record_id:
-                # For modify requests, we need to update the existing partner
-                # Use force_write context to bypass write protection during publishing
-                modified_partner = self.draft_record_id.with_context(force_write=True).action_publish()
-                if modified_partner:
-                    # Update the change request name with the updated partner name and unique_id
-                    unique_id = getattr(modified_partner, 'unique_id', '')
-                    if unique_id:
-                        self.name = f"{modified_partner.name} ({unique_id}) - CR #{self.id}"
-                    else:
-                        self.name = f"{modified_partner.name} - CR #{self.id}"
-                    self.message_post(
-                        body="Partner '%s' has been updated in the registry." % modified_partner.name,
-                        subject="Partner Updated: %s" % modified_partner.name,
-                    )
-                    _logger.info("Partner updated successfully: %s (ID: %s)", modified_partner.name, modified_partner.id)
+            if self.draft_record_id and self.partner_id:
+                # Capture old values from existing partner before modification
+                old_values = self._get_partner_values(self.partner_id)
+                
+                # Capture new values from draft record
+                new_values = self._get_draft_record_values()
+                
+                # For modify requests, we need to update the existing partner instead of creating a new one
+                # Get the data from the draft record and update the existing partner
+                import json
+                partner_data = json.loads(self.draft_record_id.partner_data)
+                
+                # Prepare update data
+                update_data = {}
+                if partner_data.get("is_group"):
+                    group_name = partner_data.get("name", "").strip().upper()
+                    update_data["name"] = group_name
+                    update_data["is_group"] = True
+                else:
+                    given_name = partner_data.get("given_name", "")
+                    family_name = partner_data.get("family_name", "")
+                    addl_name = partner_data.get("addl_name", "")
+                    update_data["name"] = f"{given_name} {family_name} {addl_name}".strip().upper()
+                    update_data["is_group"] = False
+                
+                # Add other fields from partner_data
+                for field_name in ["given_name", "family_name", "addl_name", "phone", "email", "gender", "region"]:
+                    if field_name in partner_data and partner_data[field_name]:
+                        update_data[field_name] = partner_data[field_name]
+                
+                # Update the existing partner with force_write context
+                self.partner_id.with_context(force_write=True).write(update_data)
+                
+                # Create change log entry for modification
+                self.env["change.log"].create_change_log(
+                    change_request=self,
+                    partner=self.partner_id,
+                    change_type="modify",
+                    old_values=old_values,
+                    new_values=new_values
+                )
+                
+                # Update the change request name with the updated partner name and unique_id
+                unique_id = getattr(self.partner_id, 'unique_id', '')
+                if unique_id:
+                    self.name = f"{self.partner_id.name} ({unique_id}) - CR #{self.id}"
+                else:
+                    self.name = f"{self.partner_id.name} - CR #{self.id}"
+                self.message_post(
+                    body="Partner '%s' has been updated in the registry." % self.partner_id.name,
+                    subject="Partner Updated: %s" % self.partner_id.name,
+                )
+                _logger.info("Partner updated successfully: %s (ID: %s)", self.partner_id.name, self.partner_id.id)
         
         elif self.type == "delete":
             if self.partner_id:
+                # Capture old values from partner before deletion
+                old_values = self._get_partner_values(self.partner_id)
+                
                 # Use force_write context to bypass write protection during deletion
                 self.partner_id.with_context(force_write=True).write({"active": False})
+                
+                # Create change log entry for deletion
+                self.env["change.log"].create_change_log(
+                    change_request=self,
+                    partner=self.partner_id,
+                    change_type="delete",
+                    old_values=old_values
+                )
+                
                 self.message_post(body="Partner '%s' has been deactivated." % self.partner_id.name)
 
+    def _get_partner_values(self, partner):
+        """Get current values from a partner record for change logging."""
+        try:
+            # Get the most relevant fields for change tracking
+            partner_values = {
+                "name": partner.name,
+                "is_group": getattr(partner, "is_group", False),
+                "given_name": getattr(partner, "given_name", ""),
+                "family_name": getattr(partner, "family_name", ""),
+                "addl_name": getattr(partner, "addl_name", ""),
+                "phone": partner.phone or "",
+                "email": partner.email or "",
+                "gender": getattr(partner, "gender", ""),
+                "active": partner.active,
+            }
+            
+            # Add region if it exists
+            if hasattr(partner, "region") and partner.region:
+                if hasattr(partner.region, 'id'):
+                    partner_values["region"] = partner.region.id
+                else:
+                    partner_values["region"] = partner.region
+            
+            # Add group kind if it's a group
+            if getattr(partner, "is_group", False) and hasattr(partner, "kind") and partner.kind:
+                if hasattr(partner.kind, 'id'):
+                    partner_values["kind"] = partner.kind.id
+                else:
+                    partner_values["kind"] = partner.kind
+            
+            return partner_values
+            
+        except Exception as e:
+            _logger.error("Error getting partner values for %s: %s", partner.name, str(e))
+            return {"name": partner.name, "error": "Failed to capture values"}
 
+    def _get_draft_record_values(self):
+        """Get values from draft record for change logging."""
+        try:
+            if not self.draft_record_id:
+                return {}
+            
+            draft_record = self.draft_record_id
+            draft_values = {
+                "name": draft_record.name,
+                "is_group": draft_record.is_group,
+                "given_name": getattr(draft_record, "given_name", ""),
+                "family_name": getattr(draft_record, "family_name", ""),
+                "addl_name": getattr(draft_record, "addl_name", ""),
+                "phone": getattr(draft_record, "phone", ""),
+                "email": getattr(draft_record, "email", ""),
+                "gender": getattr(draft_record, "gender", ""),
+            }
+            
+            # Add region if it exists
+            if hasattr(draft_record, "region") and draft_record.region:
+                if hasattr(draft_record.region, 'id'):
+                    draft_values["region"] = draft_record.region.id
+                else:
+                    draft_values["region"] = draft_record.region
+            
+            # Add group kind if it's a group
+            if draft_record.is_group and hasattr(draft_record, "kind") and draft_record.kind:
+                if hasattr(draft_record.kind, 'id'):
+                    draft_values["kind"] = draft_record.kind.id
+                else:
+                    draft_values["kind"] = draft_record.kind
+            
+            # Also try to get data from partner_data JSON if available
+            if hasattr(draft_record, "partner_data") and draft_record.partner_data:
+                try:
+                    import json
+                    json_data = json.loads(draft_record.partner_data)
+                    # Merge JSON data, giving priority to direct field values
+                    for key, value in json_data.items():
+                        if key not in draft_values or not draft_values[key]:
+                            draft_values[key] = value
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            return draft_values
+            
+        except Exception as e:
+            _logger.error("Error getting draft record values for %s: %s", self.name, str(e))
+            return {"name": getattr(self.draft_record_id, "name", "Unknown"), "error": "Failed to capture values"}
 
     def _create_draft_record(self):
         """Create a draft record based on the change request type."""

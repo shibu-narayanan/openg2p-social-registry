@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Claim Configuration Tree View -->
+        <record id="view_claim_configuration_tree" model="ir.ui.view">
+            <field name="name">claim.configuration.tree</field>
+            <field name="model">claim.configuration</field>
+            <field name="arch" type="xml">
+                <tree string="Claim Configurations" decoration-muted="not is_active">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name"/>
+                    <field name="target_model"/>
+                    <field name="approval_workflow"/>
+                    <field name="field_count"/>
+                    <field name="document_count"/>
+                    <field name="mandatory_document_count"/>
+                    <field name="claim_request_count"/>
+                    <field name="active_claim_count"/>
+                    <field name="is_active" widget="boolean_toggle"/>
+                </tree>
+            </field>
+        </record>
+
+        <!-- Claim Configuration Form View -->
+        <record id="view_claim_configuration_form" model="ir.ui.view">
+            <field name="name">claim.configuration.form</field>
+            <field name="model">claim.configuration</field>
+            <field name="arch" type="xml">
+                <form string="Claim Configuration">
+                    <header>
+                        <button name="action_view_field_mappings" type="object" 
+                                string="Field Mappings" class="btn-primary"
+                                icon="fa-list"/>
+                        <button name="action_view_document_requirements" type="object" 
+                                string="Document Requirements" class="btn-secondary"
+                                icon="fa-file-text-o"/>
+                        <button name="action_view_claim_requests" type="object" 
+                                string="All Claims" class="btn-info"
+                                icon="fa-folder"/>
+                        <button name="action_view_active_claims" type="object" 
+                                string="Active Claims" class="btn-warning"
+                                icon="fa-clock-o"/>
+                        <field name="is_active" widget="boolean_button" 
+                               options='{"terminology": "active"}'/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_field_mappings" type="object" 
+                                    class="oe_stat_button" icon="fa-list">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value">
+                                        <field name="field_count"/>
+                                    </span>
+                                    <span class="o_stat_text">Fields</span>
+                                </div>
+                            </button>
+                            <button name="action_view_document_requirements" type="object" 
+                                    class="oe_stat_button" icon="fa-file-text-o">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value">
+                                        <field name="document_count"/>
+                                    </span>
+                                    <span class="o_stat_text">Documents</span>
+                                </div>
+                            </button>
+                            <button name="action_view_claim_requests" type="object" 
+                                    class="oe_stat_button" icon="fa-folder">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value">
+                                        <field name="claim_request_count"/>
+                                    </span>
+                                    <span class="o_stat_text">Total Claims</span>
+                                </div>
+                            </button>
+                            <button name="action_view_active_claims" type="object" 
+                                    class="oe_stat_button" icon="fa-clock-o">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value">
+                                        <field name="active_claim_count"/>
+                                    </span>
+                                    <span class="o_stat_text">Active Claims</span>
+                                </div>
+                            </button>
+                        </div>
+                        
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" placeholder="Claim Type Name"/>
+                            </h1>
+                        </div>
+                        
+                        <group>
+                            <group>
+                                <field name="sequence"/>
+                                <field name="target_model"/>
+                                <field name="approval_workflow"/>
+                            </group>
+                            <group>
+                                <field name="is_active"/>
+                                <field name="mandatory_document_count" readonly="True"/>
+                            </group>
+                        </group>
+                        
+                        <notebook>
+                            <page string="Description" name="description">
+                                <field name="description" nolabel="True"/>
+                            </page>
+                            
+                            <page string="Field Mappings" name="field_mappings">
+                                <field name="field_mappings" nolabel="True">
+                                    <tree editable="bottom" create="true" delete="true">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="claim_field_name"/>
+                                        <field name="target_field_name"/>
+                                        <field name="field_type"/>
+                                        <field name="is_required"/>
+                                        <field name="help_text"/>
+                                    </tree>
+                                    <form>
+                                        <group>
+                                            <group>
+                                                <field name="claim_field_name"/>
+                                                <field name="target_field_name"/>
+                                                <field name="field_type"/>
+                                                <field name="is_required"/>
+                                            </group>
+                                            <group>
+                                                <field name="sequence"/>
+                                                <field name="default_value"/>
+                                            </group>
+                                        </group>
+                                        <group>
+                                            <field name="help_text"/>
+                                            <field name="validation_rules"/>
+                                            <field name="selection_options" 
+                                                   invisible="field_type != 'selection'"/>
+                                        </group>
+                                    </form>
+                                </field>
+                            </page>
+                            
+                            <page string="Document Requirements" name="document_requirements">
+                                <field name="document_requirements" nolabel="True">
+                                    <tree editable="bottom" create="true" delete="true">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="document_type"/>
+                                        <field name="is_mandatory"/>
+                                        <field name="file_formats"/>
+                                        <field name="max_file_size"/>
+                                    </tree>
+                                    <form>
+                                        <group>
+                                            <group>
+                                                <field name="document_type"/>
+                                                <field name="is_mandatory"/>
+                                                <field name="sequence"/>
+                                            </group>
+                                            <group>
+                                                <field name="file_formats"/>
+                                                <field name="max_file_size"/>
+                                            </group>
+                                        </group>
+                                        <group>
+                                            <field name="description"/>
+                                        </group>
+                                    </form>
+                                </field>
+                            </page>
+                            
+                            <page string="Recent Claims" name="recent_claims">
+                                <field name="claim_requests" nolabel="True" readonly="True">
+                                    <tree limit="10" decoration-muted="state == 'rejected'" 
+                                          decoration-success="state == 'approved'"
+                                          decoration-info="state == 'submitted'">
+                                        <field name="name"/>
+                                        <field name="registrant_name"/>
+                                        <field name="requester_name"/>
+                                        <field name="state"/>
+                                        <field name="create_date"/>
+                                        <field name="field_count"/>
+                                        <field name="document_count"/>
+                                    </tree>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" widget="mail_followers"/>
+                        <field name="activity_ids" widget="mail_activity"/>
+                        <field name="message_ids" widget="mail_thread"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <!-- Claim Configuration Search View -->
+        <record id="view_claim_configuration_search" model="ir.ui.view">
+            <field name="name">claim.configuration.search</field>
+            <field name="model">claim.configuration</field>
+            <field name="arch" type="xml">
+                <search string="Claim Configurations">
+                    <field name="name"/>
+                    <field name="description"/>
+                    <field name="target_model"/>
+                    <field name="approval_workflow"/>
+                    <separator/>
+                    <filter string="Active" name="active" domain="[('is_active', '=', True)]"/>
+                    <filter string="Inactive" name="inactive" domain="[('is_active', '=', False)]"/>
+                    <separator/>
+                    <filter string="Single Approver" name="single_approver" 
+                            domain="[('approval_workflow', '=', 'single_approver')]"/>
+                    <filter string="Multiple Approvers" name="multi_approver" 
+                            domain="[('approval_workflow', '=', 'multi_approver')]"/>
+                    <filter string="Auto Approve" name="auto_approve" 
+                            domain="[('approval_workflow', '=', 'auto_approve')]"/>
+                    <separator/>
+                    <group expand="False" string="Group By">
+                        <filter string="Approval Workflow" name="group_workflow" 
+                                context="{'group_by': 'approval_workflow'}"/>
+                        <filter string="Target Model" name="group_target_model" 
+                                context="{'group_by': 'target_model'}"/>
+                        <filter string="Active Status" name="group_active" 
+                                context="{'group_by': 'is_active'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Claim Configuration Kanban View -->
+        <record id="view_claim_configuration_kanban" model="ir.ui.view">
+            <field name="name">claim.configuration.kanban</field>
+            <field name="model">claim.configuration</field>
+            <field name="arch" type="xml">
+                <kanban string="Claim Configurations" class="o_kanban_small_column">
+                    <field name="name"/>
+                    <field name="description"/>
+                    <field name="is_active"/>
+                    <field name="field_count"/>
+                    <field name="document_count"/>
+                    <field name="claim_request_count"/>
+                    <field name="active_claim_count"/>
+                    <field name="approval_workflow"/>
+                    <templates>
+                        <t t-name="kanban-box">
+                            <div class="oe_kanban_card oe_kanban_global_click">
+                                <div class="oe_kanban_content">
+                                    <div class="o_kanban_record_top">
+                                        <div class="o_kanban_record_headings">
+                                            <strong class="o_kanban_record_title">
+                                                <field name="name"/>
+                                            </strong>
+                                        </div>
+                                        <div class="o_kanban_record_subtitle">
+                                            <field name="approval_workflow"/>
+                                        </div>
+                                    </div>
+                                    <div class="o_kanban_record_body">
+                                        <field name="description"/>
+                                    </div>
+                                    <div class="o_kanban_record_bottom">
+                                        <div class="oe_kanban_bottom_left">
+                                            <span class="badge badge-info">
+                                                <field name="field_count"/> Fields
+                                            </span>
+                                            <span class="badge badge-secondary">
+                                                <field name="document_count"/> Docs
+                                            </span>
+                                        </div>
+                                        <div class="oe_kanban_bottom_right">
+                                            <span class="badge badge-primary">
+                                                <field name="claim_request_count"/> Claims
+                                            </span>
+                                            <span t-if="record.active_claim_count.value > 0" 
+                                                  class="badge badge-warning">
+                                                <field name="active_claim_count"/> Active
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- Claim Configuration Action -->
+        <record id="action_claim_configuration" model="ir.actions.act_window">
+            <field name="name">Claim Configurations</field>
+            <field name="res_model">claim.configuration</field>
+            <field name="view_mode">tree,form,kanban</field>
+            <field name="search_view_id" ref="view_claim_configuration_search"/>
+            <field name="context">{'search_default_active': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create your first claim configuration!
+                </p>
+                <p>
+                    Claim configurations define the types of claims that users can submit.
+                    Each configuration specifies which fields can be updated and what documents are required.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

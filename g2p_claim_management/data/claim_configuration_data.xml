@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        
+        <!-- Test Registrant for Claim Management -->
+        <record id="test_registrant_claim" model="res.partner">
+            <field name="name">Test Registrant</field>
+            <field name="is_company">False</field>
+            <field name="email">test.registrant@example.com</field>
+            <field name="phone">+1234567890</field>
+            <field name="street">123 Test Street</field>
+            <field name="city">Test City</field>
+            <field name="zip">12345</field>
+            <field name="country_id" ref="base.us"/>
+        </record>
+        
+        <!-- Claim Request Sequence -->
+        <record id="seq_claim_request" model="ir.sequence">
+            <field name="name">Claim Request</field>
+            <field name="code">claim.request</field>
+            <field name="prefix">CLM</field>
+            <field name="padding">5</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+        
+        <!-- Education Update Claim Configuration -->
+        <record id="claim_config_education_update" model="claim.configuration">
+            <field name="name">Education Update</field>
+            <field name="description">Update education level and employment status</field>
+            <field name="target_model">res.partner</field>
+            <field name="is_active">True</field>
+            <field name="sequence">10</field>
+            <field name="approval_workflow">single_approver</field>
+        </record>
+        
+        <!-- Education Update Field Mappings -->
+        <record id="claim_field_education_level" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_education_update"/>
+            <field name="claim_field_name">education_level</field>
+            <field name="target_field_name">education_level</field>
+            <field name="field_type">selection</field>
+            <field name="is_required">True</field>
+            <field name="sequence">10</field>
+            <field name="help_text">Select your highest education level</field>
+            <field name="selection_options">primary|Primary
+secondary|Secondary
+higher_secondary|Higher Secondary
+bachelors|Bachelor's Degree
+masters|Master's Degree</field>
+        </record>
+        
+        <record id="claim_field_employment_status" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_education_update"/>
+            <field name="claim_field_name">employment_status</field>
+            <field name="target_field_name">employment_status</field>
+            <field name="field_type">selection</field>
+            <field name="is_required">False</field>
+            <field name="sequence">20</field>
+            <field name="help_text">Select your current employment status</field>
+            <field name="selection_options">employed_full|Employed - Full Time
+employed_part|Employed - Part Time
+self_employed|Self-employed
+unemployed|Unemployed</field>
+        </record>
+        
+        <!-- Education Update Document Requirements -->
+        <record id="claim_doc_education_certificate" model="claim.document.requirement">
+            <field name="config_id" ref="claim_config_education_update"/>
+            <field name="document_type">Education Certificate</field>
+            <field name="is_mandatory">True</field>
+            <field name="file_formats">pdf,jpg,png</field>
+            <field name="max_file_size">5</field>
+            <field name="description">Upload your education certificate or degree</field>
+            <field name="sequence">10</field>
+        </record>
+        
+        <!-- Contact Information Update Claim Configuration -->
+        <record id="claim_config_contact_update" model="claim.configuration">
+            <field name="name">Contact Information Update</field>
+            <field name="description">Update phone number and email address</field>
+            <field name="target_model">res.partner</field>
+            <field name="is_active">True</field>
+            <field name="sequence">20</field>
+            <field name="approval_workflow">single_approver</field>
+        </record>
+        
+        <!-- Contact Information Update Field Mappings -->
+        <record id="claim_field_phone" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_contact_update"/>
+            <field name="claim_field_name">phone</field>
+            <field name="target_field_name">phone</field>
+            <field name="field_type">char</field>
+            <field name="is_required">True</field>
+            <field name="sequence">10</field>
+            <field name="help_text">Enter your phone number</field>
+            <field name="validation_rules">{"pattern": "^[0-9+\\-\\s()]+$"}</field>
+        </record>
+        
+        <record id="claim_field_email" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_contact_update"/>
+            <field name="claim_field_name">email</field>
+            <field name="target_field_name">email</field>
+            <field name="field_type">char</field>
+            <field name="is_required">False</field>
+            <field name="sequence">20</field>
+            <field name="help_text">Enter your email address</field>
+            <field name="validation_rules">{"pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"}</field>
+        </record>
+        
+        <!-- Contact Information Update Document Requirements -->
+        <record id="claim_doc_contact_verification" model="claim.document.requirement">
+            <field name="config_id" ref="claim_config_contact_update"/>
+            <field name="document_type">Contact Verification</field>
+            <field name="is_mandatory">False</field>
+            <field name="file_formats">pdf,jpg,png</field>
+            <field name="max_file_size">2</field>
+            <field name="description">Upload a document showing your new contact information (optional)</field>
+            <field name="sequence">10</field>
+        </record>
+        
+        <!-- Income Update Claim Configuration -->
+        <record id="claim_config_income_update" model="claim.configuration">
+            <field name="name">Income Update</field>
+            <field name="description">Update income sources and annual income</field>
+            <field name="target_model">res.partner</field>
+            <field name="is_active">True</field>
+            <field name="sequence">30</field>
+            <field name="approval_workflow">single_approver</field>
+        </record>
+        
+        <!-- Income Update Field Mappings -->
+        <record id="claim_field_income_sources" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_income_update"/>
+            <field name="claim_field_name">income_sources</field>
+            <field name="target_field_name">income_sources</field>
+            <field name="field_type">selection</field>
+            <field name="is_required">True</field>
+            <field name="sequence">10</field>
+            <field name="help_text">Select your primary source of income</field>
+            <field name="selection_options">agriculture|Agriculture
+business|Business
+mining|Mining
+manufacturing|Manufacturing
+construction|Construction</field>
+        </record>
+        
+        <record id="claim_field_annual_income" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_income_update"/>
+            <field name="claim_field_name">annual_income</field>
+            <field name="target_field_name">annual_income</field>
+            <field name="field_type">selection</field>
+            <field name="is_required">True</field>
+            <field name="sequence">20</field>
+            <field name="help_text">Select your annual income range</field>
+            <field name="selection_options">below_5000|Below 5000
+5001_10000|5001-10,000
+above_10000|Above 10,000</field>
+        </record>
+        
+        <!-- Income Update Document Requirements -->
+        <record id="claim_doc_income_proof" model="claim.document.requirement">
+            <field name="config_id" ref="claim_config_income_update"/>
+            <field name="document_type">Income Proof</field>
+            <field name="is_mandatory">True</field>
+            <field name="file_formats">pdf,jpg,png</field>
+            <field name="max_file_size">5</field>
+            <field name="description">Upload proof of your income (salary slip, business license, etc.)</field>
+            <field name="sequence">10</field>
+        </record>
+        
+        <!-- Social Status Update Claim Configuration -->
+        <record id="claim_config_social_status_update" model="claim.configuration">
+            <field name="name">Social Status Update</field>
+            <field name="description">Update marital status and vulnerable status</field>
+            <field name="target_model">res.partner</field>
+            <field name="is_active">True</field>
+            <field name="sequence">40</field>
+            <field name="approval_workflow">single_approver</field>
+        </record>
+        
+        <!-- Social Status Update Field Mappings -->
+        <record id="claim_field_marital_status" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_social_status_update"/>
+            <field name="claim_field_name">marital_status</field>
+            <field name="target_field_name">marital_status</field>
+            <field name="field_type">selection</field>
+            <field name="is_required">True</field>
+            <field name="sequence">10</field>
+            <field name="help_text">Select your marital status</field>
+            <field name="selection_options">single|Single
+married|Married
+divorced|Divorced</field>
+        </record>
+        
+        <record id="claim_field_vulnerable_status" model="claim.field.mapping">
+            <field name="config_id" ref="claim_config_social_status_update"/>
+            <field name="claim_field_name">vulnerable_status</field>
+            <field name="target_field_name">vulnerable_status</field>
+            <field name="field_type">selection</field>
+            <field name="is_required">False</field>
+            <field name="sequence">20</field>
+            <field name="help_text">Select if you have any vulnerable status</field>
+            <field name="selection_options">yes|Yes
+no|No</field>
+        </record>
+        
+        <!-- Social Status Update Document Requirements -->
+        <record id="claim_doc_social_status_proof" model="claim.document.requirement">
+            <field name="config_id" ref="claim_config_social_status_update"/>
+            <field name="document_type">Social Status Proof</field>
+            <field name="is_mandatory">False</field>
+            <field name="file_formats">pdf,jpg,png</field>
+            <field name="max_file_size">3</field>
+            <field name="description">Upload relevant documents (marriage certificate, disability certificate, etc.)</field>
+            <field name="sequence">10</field>
+        </record>
+        
+    </data>
+</odoo>

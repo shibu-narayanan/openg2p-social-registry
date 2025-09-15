@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Claim Submission Wizard Form View -->
+        <record id="view_claim_submission_wizard_form" model="ir.ui.view">
+            <field name="name">claim.submission.wizard.form</field>
+            <field name="model">claim.submission.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Submit Claim">
+                    <header>
+                        <button name="action_load_current_values" type="object" 
+                                string="Load Current Values" class="btn-secondary"
+                                icon="fa-refresh"/>
+                        <button name="action_validate_claim" type="object" 
+                                string="Validate" class="btn-info"
+                                icon="fa-check"/>
+                        <button name="action_preview_claim" type="object" 
+                                string="Preview" class="btn-primary"
+                                icon="fa-eye"/>
+                        <button name="action_submit_claim" type="object" 
+                                string="Submit Claim" class="btn-success"
+                                icon="fa-check"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>Submit New Claim</h1>
+                        </div>
+                        
+                        <group>
+                            <group>
+                                <field name="claim_config_id" required="True"/>
+                                <field name="partner_id" required="True"/>
+                            </group>
+                            <group>
+                                <field name="requester_id" readonly="True"/>
+                            </group>
+                        </group>
+                        
+                        <notebook>
+                            <page string="Field Values" name="field_values">
+                                <div class="claim-wizard">
+                                    <div class="wizard-step active">
+                                        <div class="alert alert-info">
+                                            <strong>Instructions:</strong> Fill in the new values for the fields you want to update.
+                                            Required fields are marked with an asterisk (*).
+                                        </div>
+                                        
+                                        <!-- Dynamic field form will be generated here -->
+                                        <div id="dynamic_field_form">
+                                            <!-- Fields will be populated by JavaScript -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </page>
+                            
+                            <page string="Documents" name="documents">
+                                <div class="claim-wizard">
+                                    <div class="wizard-step active">
+                                        <div class="alert alert-info">
+                                            <strong>Instructions:</strong> Upload the required documents.
+                                            Mandatory documents are marked with a red border.
+                                        </div>
+                                        
+                                        <!-- Document upload areas will be generated here -->
+                                        <div id="document_upload_areas">
+                                            <!-- Document upload areas will be populated by JavaScript -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </page>
+                            
+                            <page string="Summary" name="summary">
+                                <div class="claim-summary">
+                                    <h3>Claim Summary</h3>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Claim Type:</span>
+                                        <span class="summary-value">
+                                            <field name="claim_config_id" readonly="True"/>
+                                        </span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Registrant:</span>
+                                        <span class="summary-value">
+                                            <field name="partner_id" readonly="True"/>
+                                        </span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Requester:</span>
+                                        <span class="summary-value">
+                                            <field name="requester_id" readonly="True"/>
+                                        </span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Fields to Update:</span>
+                                        <span class="summary-value" id="field_count_summary">0</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Documents Uploaded:</span>
+                                        <span class="summary-value" id="document_count_summary">0</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span class="summary-label">Mandatory Documents:</span>
+                                        <span class="summary-value" id="mandatory_docs_status">Not Complete</span>
+                                    </div>
+                                </div>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Claim Submission Wizard Action -->
+        <record id="action_claim_submission_wizard" model="ir.actions.act_window">
+            <field name="name">Submit Claim</field>
+            <field name="res_model">claim.submission.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="context">{}</field>
+        </record>
+
+        <!-- Claim Submission Wizard from Partner Action -->
+        <record id="action_claim_submission_wizard_from_partner" model="ir.actions.act_window">
+            <field name="name">Submit Claim for Registrant</field>
+            <field name="res_model">claim.submission.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="context">{'default_partner_id': active_id}</field>
+        </record>
+
+    </data>
+</odoo>

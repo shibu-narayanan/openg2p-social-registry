@@ -1,0 +1,12 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_claim_configuration_manager,claim.configuration.manager,model_claim_configuration,group_claim_manager,1,1,1,1
+access_claim_configuration_user,claim.configuration.user,model_claim_configuration,group_claim_user,1,0,0,0
+access_claim_field_mapping_manager,claim.field.mapping.manager,model_claim_field_mapping,group_claim_manager,1,1,1,1
+access_claim_document_requirement_manager,claim.document.requirement.manager,model_claim_document_requirement,group_claim_manager,1,1,1,1
+access_claim_request_user,claim.request.user,model_claim_request,group_claim_user,1,1,1,0
+access_claim_request_approver,claim.request.approver,model_claim_request,group_claim_approver,1,1,1,0
+access_claim_request_manager,claim.request.manager,model_claim_request,group_claim_manager,1,1,1,1
+access_claim_document_user,claim.document.user,model_claim_document,group_claim_user,1,1,1,0
+access_claim_document_approver,claim.document.approver,model_claim_document,group_claim_approver,1,1,1,0
+access_claim_document_manager,claim.document.manager,model_claim_document,group_claim_manager,1,1,1,1
+access_claim_submission_wizard_user,claim.submission.wizard.user,model_claim_submission_wizard,group_claim_user,1,1,1,0

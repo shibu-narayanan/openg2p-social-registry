@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Main Claim Management Menu -->
+        <menuitem id="menu_claim_management_root" 
+                  name="Claim Management" 
+                  sequence="50"/>
+        
+        <!-- Public Claim Management Menu (visible to all users) -->
+        <menuitem id="menu_claim_management_public" 
+                  name="Claims" 
+                  action="action_claim_management_public"
+                  sequence="60"/>
+        
+        <!-- Request Access Menu (visible to all users) -->
+        <menuitem id="menu_claim_management_request_access" 
+                  name="Request Claim Access" 
+                  parent="menu_claim_management_public"
+                  action="action_claim_management_public"
+                  sequence="10"/>
+
+        <!-- Configuration Menu -->
+        <menuitem id="menu_claim_management_config" 
+                  name="Configuration" 
+                  parent="menu_claim_management_root" 
+                  sequence="10"/>
+
+        <menuitem id="menu_claim_configuration" 
+                  name="Claim Types" 
+                  parent="menu_claim_management_config" 
+                  action="action_claim_configuration" 
+                  sequence="10"/>
+
+        <!-- Claims Menu -->
+        <menuitem id="menu_claim_management_claims" 
+                  name="Claims" 
+                  parent="menu_claim_management_root" 
+                  sequence="20" 
+                  groups="g2p_claim_management.group_claim_user"/>
+
+        <menuitem id="menu_my_claim_requests" 
+                  name="My Claims" 
+                  parent="menu_claim_management_claims" 
+                  action="action_my_claim_requests" 
+                  sequence="10" 
+                  groups="g2p_claim_management.group_claim_user"/>
+
+        <menuitem id="menu_all_claim_requests" 
+                  name="All Claims" 
+                  parent="menu_claim_management_claims" 
+                  action="action_claim_request" 
+                  sequence="20" 
+                  groups="g2p_claim_management.group_claim_approver"/>
+
+        <!-- Approval Menu -->
+        <menuitem id="menu_claim_management_approval" 
+                  name="Approval" 
+                  parent="menu_claim_management_root" 
+                  sequence="30" 
+                  groups="g2p_claim_management.group_claim_approver"/>
+
+        <menuitem id="menu_claims_for_approval" 
+                  name="Claims for Approval" 
+                  parent="menu_claim_management_approval" 
+                  action="action_claims_for_approval" 
+                  sequence="10" 
+                  groups="g2p_claim_management.group_claim_approver"/>
+
+
+        <!-- Dashboard Menu -->
+        <menuitem id="menu_claim_management_dashboard" 
+                  name="Dashboard" 
+                  parent="menu_claim_management_root" 
+                  action="action_claim_management_dashboard"
+                  sequence="5" 
+                  groups="g2p_claim_management.group_claim_user"/>
+
+        <!-- Reports Menu -->
+        <menuitem id="menu_claim_management_reports" 
+                  name="Reports" 
+                  parent="menu_claim_management_root" 
+                  sequence="40" 
+                  groups="g2p_claim_management.group_claim_manager"/>
+
+    </data>
+</odoo>

@@ -19,3 +19,6 @@ access_bulk_operations_wizard_admin,bulk.operations.wizard.admin,model_change_re
 access_change_request_reject_wizard_user,change.request.reject.wizard.user,model_change_request_reject_wizard,g2p_change_management.group_change_user,1,1,1,0
 access_change_request_reject_wizard_approver,change.request.reject.wizard.approver,model_change_request_reject_wizard,g2p_change_management.group_change_approver,1,1,1,0
 access_change_request_reject_wizard_admin,change.request.reject.wizard.admin,model_change_request_reject_wizard,g2p_change_management.group_change_admin,1,1,1,1
+access_change_log_user,change.log.user,model_change_log,g2p_change_management.group_change_user,1,0,0,0
+access_change_log_approver,change.log.approver,model_change_log,g2p_change_management.group_change_approver,1,0,0,0
+access_change_log_admin,change.log.admin,model_change_log,g2p_change_management.group_change_admin,1,0,0,0

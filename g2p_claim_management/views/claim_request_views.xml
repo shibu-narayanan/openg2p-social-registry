@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Claim Request Tree View -->
+        <record id="view_claim_request_tree" model="ir.ui.view">
+            <field name="name">claim.request.tree</field>
+            <field name="model">claim.request</field>
+            <field name="arch" type="xml">
+                <tree string="Claim Requests" decoration-muted="state == 'rejected'" 
+                      decoration-success="state == 'approved'" decoration-info="state == 'submitted'">
+                    <field name="name"/>
+                    <field name="claim_type_name"/>
+                    <field name="registrant_name"/>
+                    <field name="requester_name"/>
+                    <field name="state"/>
+                    <field name="create_date"/>
+                    <field name="approver_id"/>
+                    <field name="field_count"/>
+                    <field name="document_count"/>
+                    <field name="mandatory_documents_uploaded" widget="boolean_toggle"/>
+                </tree>
+            </field>
+        </record>
+
+        <!-- Claim Request Form View -->
+        <record id="view_claim_request_form" model="ir.ui.view">
+            <field name="name">claim.request.form</field>
+            <field name="model">claim.request</field>
+            <field name="arch" type="xml">
+                <form string="Claim Request">
+                    <header>
+                        <button name="action_submit_claim" type="object" 
+                                string="Submit for Approval" class="btn-primary"
+                                icon="fa-check" 
+                                invisible="state != 'draft'"/>
+                        <button name="action_approve_claim" type="object" 
+                                string="Approve" class="btn-success"
+                                icon="fa-check" 
+                                invisible="state != 'submitted'"/>
+                        <button name="action_reject_claim" type="object" 
+                                string="Reject" class="btn-danger"
+                                icon="fa-times" 
+                                invisible="state != 'submitted'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,rejected"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_change_request" type="object" 
+                                    class="oe_stat_button" icon="fa-exchange"
+                                    invisible="not change_request_id">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_text">Change Request</span>
+                                    <span class="o_stat_value">
+                                        <field name="change_request_id"/>
+                                    </span>
+                                </div>
+                            </button>
+                        </div>
+                        
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="True"/>
+                            </h1>
+                        </div>
+                        
+                        <group>
+                            <group>
+                                <field name="claim_config_id" 
+                                       domain="[('is_active', '=', True)]"
+                                       context="{'default_is_active': True}"/>
+                                <field name="partner_id" 
+                                       domain="[('is_company', '=', False)]"
+                                       context="{'default_is_company': False}"/>
+                                <field name="requester_id" readonly="True"/>
+                            </group>
+                            <group>
+                                <field name="state" readonly="True"/>
+                                <field name="approver_id" readonly="True"/>
+                                <field name="change_request_id" invisible="True"/>
+                                <field name="create_date" readonly="True"/>
+                                <field name="write_date" readonly="True"/>
+                            </group>
+                        </group>
+                        
+                        <notebook>
+                            <page string="Field Values" name="field_values">
+                                <group>
+                                    <field name="field_values" widget="json" readonly="True"/>
+                                </group>
+                            </page>
+                            
+                            <page string="Documents" name="documents">
+                                <field name="documents" nolabel="True">
+                                    <tree>
+                                        <field name="document_type"/>
+                                        <field name="file_name"/>
+                                        <field name="file_size_mb"/>
+                                        <field name="upload_date"/>
+                                        <field name="uploaded_by"/>
+                                        <field name="is_mandatory"/>
+                                        <button name="action_download" type="object" 
+                                                string="Download" icon="fa-download"/>
+                                    </tree>
+                                    <form>
+                                        <group>
+                                            <group>
+                                                <field name="document_type"/>
+                                                <field name="file_name"/>
+                                                <field name="uploaded_by"/>
+                                            </group>
+                                            <group>
+                                                <field name="file_size_mb"/>
+                                                <field name="file_extension"/>
+                                                <field name="upload_date"/>
+                                            </group>
+                                        </group>
+                                        <group>
+                                            <field name="is_mandatory"/>
+                                            <field name="mimetype"/>
+                                        </group>
+                                    </form>
+                                </field>
+                            </page>
+                            
+                            <page string="Field Comparison" name="field_comparison" 
+                                  invisible="state in ['draft']">
+                                <div class="claim-field-comparison">
+                                    <div class="field-label">Field</div>
+                                    <div class="field-label">Current Value</div>
+                                    <div class="field-label">Proposed Value</div>
+                                    <!-- Field comparison will be populated by JavaScript -->
+                                </div>
+                            </page>
+                            
+                            <page string="Approval Comments" name="approval_comments" 
+                                  invisible="state in ['draft']">
+                                <group>
+                                    <field name="description" readonly="True"/>
+                                    <field name="rejection_reason" readonly="True"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" widget="mail_followers"/>
+                        <field name="activity_ids" widget="mail_activity"/>
+                        <field name="message_ids" widget="mail_thread"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <!-- Claim Request Search View -->
+        <record id="view_claim_request_search" model="ir.ui.view">
+            <field name="name">claim.request.search</field>
+            <field name="model">claim.request</field>
+            <field name="arch" type="xml">
+                <search string="Claim Requests">
+                    <field name="name"/>
+                    <field name="claim_type_name"/>
+                    <field name="registrant_name"/>
+                    <field name="requester_name"/>
+                    <field name="approver_id"/>
+                    <separator/>
+                    <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                    <filter string="Submitted" name="submitted" domain="[('state', '=', 'submitted')]"/>
+                    <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                    <filter string="Rejected" name="rejected" domain="[('state', '=', 'rejected')]"/>
+                    <separator/>
+                    <filter string="My Claims" name="my_claims" 
+                            domain="[('requester_id', '=', uid)]"/>
+                    <filter string="Claims for Approval" name="for_approval" 
+                            domain="[('approver_id', '=', uid), ('state', '=', 'submitted')]"/>
+                    <separator/>
+                    <filter string="Missing Mandatory Documents" name="missing_docs" 
+                            domain="[('mandatory_documents_uploaded', '=', False)]"/>
+                    <separator/>
+                    <filter string="This Week" name="this_week" 
+                            domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                    <filter string="This Month" name="this_month" 
+                            domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                    <group expand="False" string="Group By">
+                        <filter string="State" name="group_state" 
+                                context="{'group_by': 'state'}"/>
+                        <filter string="Claim Type" name="group_claim_type" 
+                                context="{'group_by': 'claim_config_id'}"/>
+                        <filter string="Requester" name="group_requester" 
+                                context="{'group_by': 'requester_id'}"/>
+                        <filter string="Approver" name="group_approver" 
+                                context="{'group_by': 'approver_id'}"/>
+                        <filter string="Creation Date" name="group_create_date" 
+                                context="{'group_by': 'create_date:month'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Claim Request Kanban View -->
+        <record id="view_claim_request_kanban" model="ir.ui.view">
+            <field name="name">claim.request.kanban</field>
+            <field name="model">claim.request</field>
+            <field name="arch" type="xml">
+                <kanban string="Claim Requests" class="o_kanban_small_column">
+                    <field name="name"/>
+                    <field name="claim_type_name"/>
+                    <field name="registrant_name"/>
+                    <field name="requester_name"/>
+                    <field name="state"/>
+                    <field name="create_date"/>
+                    <field name="field_count"/>
+                    <field name="document_count"/>
+                    <field name="mandatory_documents_uploaded"/>
+                    <templates>
+                        <t t-name="kanban-box">
+                            <div class="oe_kanban_card oe_kanban_global_click">
+                                <div class="oe_kanban_content">
+                                    <div class="o_kanban_record_top">
+                                        <div class="o_kanban_record_headings">
+                                            <strong class="o_kanban_record_title">
+                                                <field name="name"/>
+                                            </strong>
+                                        </div>
+                                        <div class="o_kanban_record_subtitle">
+                                            <field name="claim_type_name"/>
+                                        </div>
+                                    </div>
+                                    <div class="o_kanban_record_body">
+                                        <div>
+                                            <strong>Registrant:</strong> <field name="registrant_name"/>
+                                        </div>
+                                        <div>
+                                            <strong>Requester:</strong> <field name="requester_name"/>
+                                        </div>
+                                    </div>
+                                    <div class="o_kanban_record_bottom">
+                                        <div class="oe_kanban_bottom_left">
+                                            <span class="badge badge-info">
+                                                <field name="field_count"/> Fields
+                                            </span>
+                                            <span class="badge badge-secondary">
+                                                <field name="document_count"/> Docs
+                                            </span>
+                                        </div>
+                                        <div class="oe_kanban_bottom_right">
+                                            <span t-if="record.mandatory_documents_uploaded.value" 
+                                                  class="badge badge-success">Docs OK</span>
+                                            <span t-if="!record.mandatory_documents_uploaded.value" 
+                                                  class="badge badge-warning">Missing Docs</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- Claim Request Action -->
+        <record id="action_claim_request" model="ir.actions.act_window">
+            <field name="name">Claim Requests</field>
+            <field name="res_model">claim.request</field>
+            <field name="view_mode">tree,form,kanban</field>
+            <field name="search_view_id" ref="view_claim_request_search"/>
+            <field name="context">{'search_default_my_claims': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No claim requests found!
+                </p>
+                <p>
+                    Claim requests allow you to request updates to registrant information.
+                    Each claim goes through an approval process before changes are applied.
+                </p>
+            </field>
+        </record>
+
+        <!-- My Claims Action -->
+        <record id="action_my_claim_requests" model="ir.actions.act_window">
+            <field name="name">My Claims</field>
+            <field name="res_model">claim.request</field>
+            <field name="view_mode">tree,form,kanban</field>
+            <field name="search_view_id" ref="view_claim_request_search"/>
+            <field name="context">{'search_default_my_claims': 1}</field>
+            <field name="domain">[('requester_id', '=', uid)]</field>
+        </record>
+
+        <!-- Claims for Approval Action -->
+        <record id="action_claims_for_approval" model="ir.actions.act_window">
+            <field name="name">Claims for Approval</field>
+            <field name="res_model">claim.request</field>
+            <field name="view_mode">tree,form,kanban</field>
+            <field name="search_view_id" ref="view_claim_request_search"/>
+            <field name="context">{'search_default_for_approval': 1}</field>
+            <field name="domain">[('approver_id', '=', uid), ('state', '=', 'submitted')]</field>
+        </record>
+
+        <!-- Claim Management Dashboard Action -->
+        <record id="action_claim_management_dashboard" model="ir.actions.act_window">
+            <field name="name">Claim Management Dashboard</field>
+            <field name="res_model">claim.request</field>
+            <field name="view_mode">kanban,tree,form</field>
+            <field name="search_view_id" ref="view_claim_request_search"/>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Welcome to Claim Management!
+                </p>
+                <p>
+                    This dashboard shows an overview of all claim requests in the system.
+                    Use the filters to view specific types of claims or statuses.
+                </p>
+            </field>
+        </record>
+
+        <!-- Public Claim Management Action (redirects based on permissions) -->
+        <record id="action_claim_management_public" model="ir.actions.act_window">
+            <field name="name">Claims</field>
+            <field name="res_model">claim.request</field>
+            <field name="view_mode">kanban,tree,form</field>
+            <field name="search_view_id" ref="view_claim_request_search"/>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Welcome to Claims!
+                </p>
+                <p>
+                    This is the claims management system. If you don't see all options,
+                    contact your administrator to assign you the appropriate permissions.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>
