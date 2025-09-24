@@ -9,9 +9,10 @@
                     <group>
                         <field name="selected_member_ids" 
                                widget="many2many_tags" 
-                               options="{'no_create': True}"
+                               options="{'no_create': True, 'no_open': True}"
                                context="{'member_selection_context': True}"
                                nolabel="1" />
+                        <button string="Select Members" type="object" name="action_select_members" class="btn-info" />
                     </group>
                     <footer>
                         <button string="Save" type="object" name="action_save_members" class="btn-primary" />

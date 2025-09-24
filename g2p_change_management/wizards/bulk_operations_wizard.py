@@ -115,11 +115,11 @@ class BulkOperationsWizard(models.TransientModel):
         user = self.env.user
         
         if self.operation_type in ['approve', 'reject']:
-            return user.has_group('g2p_change_management.group_change_approver')
+            return user.has_group('g2p_change_management.group_int_approver')
         elif self.operation_type in ['submit', 'cancel']:
-            return user.has_group('g2p_change_management.group_change_user')
+            return user.has_group('g2p_change_management.group_int_validator')
         elif self.operation_type == 'assign':
-            return user.has_group('g2p_change_management.group_change_approver')
+            return user.has_group('g2p_change_management.group_int_approver')
         
         return False
 

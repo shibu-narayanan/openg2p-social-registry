@@ -464,7 +464,7 @@ class ChangeRequest(models.Model):
             user = self.env.user
             record.can_approve = (
                 record.state == "submitted" and
-                user.has_group("g2p_change_management.group_change_approver")
+                user.has_group("g2p_change_management.group_int_approver")
             )
     
     @api.depends("state", "requester_id")
@@ -474,7 +474,7 @@ class ChangeRequest(models.Model):
             user = self.env.user
             record.can_reject = (
                 record.state == "submitted" and
-                user.has_group("g2p_change_management.group_change_approver")
+                user.has_group("g2p_change_management.group_int_approver")
             )
     
     @api.constrains("name")
@@ -650,7 +650,7 @@ class ChangeRequest(models.Model):
         
         # Validate approvers exist
         approvers = self.env["res.users"].search([
-            ("groups_id", "in", self.env.ref("g2p_change_management.group_change_approver").id)
+            ("groups_id", "in", self.env.ref("g2p_change_management.group_int_approver").id)
         ])
         if not approvers:
             raise UserError("No approvers found. Please contact your administrator.")
@@ -688,7 +688,7 @@ class ChangeRequest(models.Model):
             raise UserError("Only submitted change requests can be approved.")
         
         # Validate permissions
-        if not self.env.user.has_group("g2p_change_management.group_change_approver"):
+        if not self.env.user.has_group("g2p_change_management.group_int_approver"):
             raise UserError("You don't have permission to approve change requests.")
         
         # Update state
@@ -738,7 +738,7 @@ class ChangeRequest(models.Model):
             raise UserError("Only submitted change requests can be rejected.")
         
         # Validate permissions
-        if not self.env.user.has_group("g2p_change_management.group_change_approver"):
+        if not self.env.user.has_group("g2p_change_management.group_int_approver"):
             raise UserError("You don't have permission to reject change requests.")
         
         # For now, we'll handle rejection directly without a wizard
@@ -791,7 +791,7 @@ class ChangeRequest(models.Model):
         user = self.env.user
         
         if action in ["approve", "reject"]:
-            if not user.has_group("g2p_change_management.group_change_approver"):
+            if not user.has_group("g2p_change_management.group_int_approver"):
                 raise UserError("You don't have permission to %s change requests." % action)
         
         elif action == "submit":
@@ -813,8 +813,8 @@ class ChangeRequest(models.Model):
             "last_update": self.write_date,
             "has_draft_record": bool(self.draft_record_id),
             "can_submit": self.state == "draft" and self.requester_id == self.env.user,
-            "can_approve": self.state == "submitted" and self.env.user.has_group("g2p_change_management.group_change_approver"),
-            "can_reject": self.state == "submitted" and self.env.user.has_group("g2p_change_management.group_change_approver"),
+            "can_approve": self.state == "submitted" and self.env.user.has_group("g2p_change_management.group_int_approver"),
+            "can_reject": self.state == "submitted" and self.env.user.has_group("g2p_change_management.group_int_approver"),
         }
 
     def action_reset_to_draft(self):
@@ -834,7 +834,7 @@ class ChangeRequest(models.Model):
     def _create_approval_activity(self):
         """Create approval activity for approvers."""
         approvers = self.env["res.users"].search([
-            ("groups_id", "in", self.env.ref("g2p_change_management.group_change_approver").id)
+            ("groups_id", "in", self.env.ref("g2p_change_management.group_int_approver").id)
         ])
         
         if not approvers:

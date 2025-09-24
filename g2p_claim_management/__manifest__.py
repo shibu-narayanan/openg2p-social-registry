@@ -11,8 +11,7 @@
     "depends": [
         "base",
         "mail",
-        "g2p_change_management",  # For CR integration
-        "g2p_draft_publish",      # For draft record integration
+        "g2p_change_management",  # For CR and draft record integration
         "g2p_social_registry_model",  # For registrant attributes
     ],
     "data": [

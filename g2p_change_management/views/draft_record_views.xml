@@ -23,4 +23,31 @@
             </xpath>
         </field>
     </record>
+
+    <!-- Dedicated view for individual draft member selection -->
+    <record id="view_draft_record_individual_selection_tree" model="ir.ui.view">
+        <field name="name">draft.record.individual.selection.tree</field>
+        <field name="model">draft.record</field>
+        <field name="arch" type="xml">
+            <tree string="Individual Draft Members" create="false" edit="false" delete="false">
+                <field name="name" string="Member Name" />
+                <field name="given_name" string="Given Name" />
+                <field name="family_name" string="Family Name" />
+                <field name="phone" string="Phone" />
+                <field name="gender" string="Gender" />
+                <field name="region" string="Region" />
+            </tree>
+        </field>
+    </record>
+
+    <!-- Action for individual draft member selection -->
+    <record id="action_draft_record_individual_selection" model="ir.actions.act_window">
+        <field name="name">Select Individual Draft Members</field>
+        <field name="res_model">draft.record</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_draft_record_individual_selection_tree"/>
+        <field name="domain">[('is_group', '=', False)]</field>
+        <field name="context">{'member_selection_context': True}</field>
+        <field name="target">new</field>
+    </record>
 </odoo>

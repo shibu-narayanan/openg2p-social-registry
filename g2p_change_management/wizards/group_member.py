@@ -32,6 +32,22 @@ class DraftGroupAddMembersWizard(models.TransientModel):
         self.group_id.group_member_ids_json = self.selected_member_ids.ids
         return {"type": "ir.actions.act_window_close"}
 
+    def action_select_members(self):
+        """Open the dedicated individual draft member selection view."""
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Select Individual Draft Members",
+            "res_model": "draft.record",
+            "view_mode": "tree",
+            "view_id": self.env.ref("g2p_change_management.view_draft_record_individual_selection_tree").id,
+            "domain": [("is_group", "=", False)],
+            "context": {
+                "member_selection_context": True,
+                "default_selected_member_ids": self.selected_member_ids.ids,
+            },
+            "target": "new",
+        }
+
 
 
     

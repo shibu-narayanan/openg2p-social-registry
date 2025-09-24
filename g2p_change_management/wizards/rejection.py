@@ -25,7 +25,7 @@ class RejectWizard(models.TransientModel):
 
         record.message_post(body=f"Record rejected: {self.rejection_reason}")
 
-        validator_group = self.env.ref("g2p_draft_publish.group_int_validator")
+        validator_group = self.env.ref("g2p_change_management.group_int_validator")
         validator_users = validator_group.users
 
         if validator_users:

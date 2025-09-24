@@ -71,8 +71,8 @@ class G2PDraftRecord(models.Model):
                     ("state", "in", allowed_states)
                 ])
                 
-                # If no Change Request exists or if it's in an allowed state, include it
-                if not change_requests.exists() or any(cr.state in allowed_states for cr in change_requests):
+                # Only include if it has Change Requests in allowed states (draft or submitted)
+                if change_requests.exists():
                     filtered_records |= draft_record
             
             # Apply name search on filtered records
@@ -100,8 +100,8 @@ class G2PDraftRecord(models.Model):
                     ("state", "in", allowed_states)
                 ])
                 
-                # If no Change Request exists or if it's in an allowed state, include it
-                if not change_requests.exists() or any(cr.state in allowed_states for cr in change_requests):
+                # Only include if it has Change Requests in allowed states (draft or submitted)
+                if change_requests.exists():
                     final_filtered_records |= draft_record
             
             # Add Change Request state information to the display name
@@ -109,13 +109,14 @@ class G2PDraftRecord(models.Model):
             for record in final_filtered_records:
                 # Find the most recent Change Request for this draft record
                 change_request = self.env["change.request"].search([
-                    ("draft_record_id", "=", record.id)
+                    ("draft_record_id", "=", record.id),
+                    ("state", "in", allowed_states)
                 ], order="create_date desc", limit=1)
                 
                 if change_request:
                     display_name = f"{record.name} (CR: {change_request.state})"
                 else:
-                    display_name = f"{record.name} (No CR)"
+                    display_name = record.name
                 
                 result.append((record.id, display_name))
             
@@ -207,7 +208,7 @@ class G2PDraftRecord(models.Model):
             "type": "ir.actions.act_window",
             "res_model": "change.state.wizard",
             "view_mode": "form",
-            "view_id": self.env.ref("g2p_draft_publish.change_state_wizard_view").id,
+            "view_id": self.env.ref("g2p_change_management.change_state_wizard_view").id,
             "target": "new",
         }
 
@@ -308,9 +309,9 @@ class G2PDraftRecord(models.Model):
 
     def _notify_validators(self):
         """Notify appropriate validator users about the published record."""
-        validator_group = self.env.ref("g2p_draft_publish.group_int_validator")
-        admin_group = self.env.ref("g2p_draft_publish.group_int_admin")
-        approver_group = self.env.ref("g2p_draft_publish.group_int_approver")
+        validator_group = self.env.ref("g2p_change_management.group_int_validator")
+        admin_group = self.env.ref("g2p_change_management.group_int_admin")
+        approver_group = self.env.ref("g2p_change_management.group_int_approver")
 
         validator_users = validator_group.users
         exclusive_validator_users = validator_users.filtered(
@@ -350,7 +351,7 @@ class G2PDraftRecord(models.Model):
             if activities:
                 activities.action_done()
 
-            approver_group = self.env.ref("g2p_draft_publish.group_int_approver")
+            approver_group = self.env.ref("g2p_change_management.group_int_approver")
             approver_users = approver_group.users
             if approver_users:
                 for user in approver_users:
@@ -406,22 +407,22 @@ class G2PDraftRecord(models.Model):
 
     def action_open_individual_wizard(self):
         return self._return_wizard_with_context(
-            self.env.ref("g2p_draft_publish.g2p_validation_individual_form_view").id
+            self.env.ref("g2p_change_management.g2p_validation_individual_form_view").id
         )
 
     def action_open_individual_wizard_view_only(self):
         return self._return_wizard_with_context(
-            self.env.ref("g2p_draft_publish.g2p_validation_individual_form_view_only").id
+            self.env.ref("g2p_change_management.g2p_validation_individual_form_view_only").id
         )
 
     def action_open_group_wizard(self):
         return self._return_wizard_with_context(
-            self.env.ref("g2p_draft_publish.g2p_validation_group_form_view").id
+            self.env.ref("g2p_change_management.g2p_validation_group_form_view").id
         )
 
     def action_open_group_wizard_view_only(self):
         return self._return_wizard_with_context(
-            self.env.ref("g2p_draft_publish.g2p_validation_group_form_view_only").id
+            self.env.ref("g2p_change_management.g2p_validation_group_form_view_only").id
         )
 
     def _process_json_data(self, json_data):

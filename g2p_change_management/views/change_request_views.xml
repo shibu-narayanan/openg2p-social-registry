@@ -120,7 +120,7 @@
     <field name="state">code</field>
     <field name="binding_model_id" ref="model_change_request"/>
     <field name="binding_view_types">list</field>
-    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_approver'))]"/>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_int_approver'))]"/>
     <field name="code">
 if records:
     action = records.action_bulk_approve()
@@ -133,7 +133,7 @@ if records:
     <field name="state">code</field>
     <field name="binding_model_id" ref="model_change_request"/>
     <field name="binding_view_types">list</field>
-    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_approver'))]"/>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_int_approver'))]"/>
     <field name="code">
 if records:
     action = records.action_bulk_reject()
@@ -146,7 +146,7 @@ if records:
     <field name="state">code</field>
     <field name="binding_model_id" ref="model_change_request"/>
     <field name="binding_view_types">list</field>
-    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_user'))]"/>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_int_validator'))]"/>
     <field name="code">
 if records:
     action = records.action_bulk_submit()
@@ -159,7 +159,7 @@ if records:
     <field name="state">code</field>
     <field name="binding_model_id" ref="model_change_request"/>
     <field name="binding_view_types">list</field>
-    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_user'))]"/>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_int_validator'))]"/>
     <field name="code">
 if records:
     action = records.action_bulk_cancel()
@@ -172,7 +172,7 @@ if records:
     <field name="state">code</field>
     <field name="binding_model_id" ref="model_change_request"/>
     <field name="binding_view_types">list</field>
-    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_change_approver'))]"/>
+    <field name="groups_id" eval="[(4, ref('g2p_change_management.group_int_approver'))]"/>
     <field name="code">
 if records:
     action = records.action_bulk_assign()

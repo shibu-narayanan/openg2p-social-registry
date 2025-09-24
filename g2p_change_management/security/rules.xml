@@ -1,66 +1,75 @@
 <odoo>
 
-    <!-- Change Management Module Category -->
-    <record model="ir.module.category" id="module_category_change_management">
-        <field name="name">Change Management</field>
-        <field name="description">User access level for Change Management module</field>
-        <field name="sequence">20</field>
-    </record>
+<record model="ir.module.category" id="integration_module">
+    <field name="name">Draft Publish</field>
+    <field name="description">User access level for  Draft Publish module</field>
+    <field name="sequence">3</field>
+</record>
+<record id="group_int_validator" model="res.groups">
+    <field name="name">User</field>
+    <field name="category_id" ref="integration_module" />
+</record>
 
-    <!-- Change Request User Group -->
-    <record id="group_change_user" model="res.groups">
-        <field name="name">User</field>
-        <field name="category_id" ref="module_category_change_management"/>
-    </record>
+<record id="group_int_approver" model="res.groups">
+    <field name="name">Draft Approver</field>
+    <field name="implied_ids" eval="[(4, ref('group_int_validator'))]" />
+    <field name="category_id" ref="integration_module" />
+</record>
 
-    <!-- Change Request Approver Group -->
-    <record id="group_change_approver" model="res.groups">
-        <field name="name">Approver</field>
-        <field name="category_id" ref="module_category_change_management"/>
-        <field name="implied_ids" eval="[(4, ref('group_change_user'))]"/>
-    </record>
+<record id="group_int_admin" model="res.groups">
+    <field name="name">Admin</field>
+    <field name="implied_ids" eval="[(4, ref('group_int_approver'))]" />
+    <field name="category_id" ref="integration_module" />
+</record>
 
-    <!-- Change Request Admin Group -->
-    <record id="group_change_admin" model="res.groups">
-        <field name="name">Administrator</field>
-        <field name="category_id" ref="module_category_change_management"/>
-        <field name="implied_ids" eval="[(4, ref('group_change_approver'))]"/>
-    </record>
 
-    <!-- Record Rules -->
-    
-    <!-- Users can only see their own change requests -->
-    <record id="change_request_user_rule" model="ir.rule">
-        <field name="name">Change Request User Access</field>
-        <field name="model_id" ref="model_change_request"/>
-        <field name="domain_force">[('requester_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('group_change_user'))]"/>
-    </record>
+<!--
 
-    <!-- Approvers can see all submitted change requests -->
-    <record id="change_request_approver_rule" model="ir.rule">
-        <field name="name">Change Request Approver Access</field>
-        <field name="model_id" ref="model_change_request"/>
-        <field name="domain_force">[('state', 'in', ['submitted', 'approved', 'rejected'])]</field>
-        <field name="groups" eval="[(4, ref('group_change_approver'))]"/>
-    </record>
+<record id="g2p_draft_record_following_restriction_rule" model="ir.rule">
+    <field name="name">Draft  Records Follower</field>
+    <field name="model_id" ref="model_draft_record" />
+    <field
+            name="domain_force"
+        >['|', ('message_partner_ids', 'in', [user.partner_id.id]), ('message_partner_ids','=',False) ]</field>
+    <field
+            name="groups"
+            eval="[(6, 0, [ref('g2p_change_management.group_int_validator'), ref('g2p_change_management.group_int_approver')])]"
+        />
+</record>
+ -->
 
-    <!-- Admins can see all change requests -->
-    <record id="change_request_admin_rule" model="ir.rule">
-        <field name="name">Change Request Admin Access</field>
-        <field name="model_id" ref="model_change_request"/>
-        <field name="groups" eval="[(4, ref('group_change_admin'))]"/>
-    </record>
 
-    <!-- Partner modification prevention rule -->
-    <record id="partner_modification_prevention_rule" model="ir.rule">
-        <field name="name">Prevent Direct Partner Modification</field>
-        <field name="model_id" ref="base.model_res_partner"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_change_user')), (4, ref('group_change_approver'))]"/>
-        <field name="perm_read" eval="True"/>
-        <field name="perm_write" eval="False"/>
-        <field name="perm_create" eval="True"/>
-        <field name="perm_unlink" eval="False"/>
-    </record>
+
+
+
+<record id="g2p_draft_record_following_restriction_rule" model="ir.rule">
+    <field name="name">Draft  Records Follower</field>
+    <field name="model_id" ref="model_draft_record" />
+    <field
+            name="domain_force"
+        >['|', ('message_partner_ids', 'in', [user.partner_id.id]), ('message_partner_ids','=',False) ]</field>
+    <field
+            name="groups"
+            eval="[(6, 0, [ref('g2p_change_management.group_int_validator'), ref('g2p_change_management.group_int_approver')])]"
+        />
+</record>
+
+
+
+
+
+
+
+
+
+
+
+
+<record id="draft_record_followers_rule_admin" model="ir.rule">
+    <field name="name">Admin Can View ALL Draft Imported Records </field>
+    <field name="model_id" ref="model_draft_record" />
+    <field name="groups" eval="[(6, 0, [ref('g2p_change_management.group_int_admin')])]" />
+</record>
+
+
 </odoo>

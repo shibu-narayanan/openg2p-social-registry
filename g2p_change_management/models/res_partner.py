@@ -257,6 +257,8 @@ class ResPartner(models.Model):
     def action_create_change_request(self):
         """Create a change request for this partner."""
         self.ensure_one()
+        # Simple test method
+        return {"type": "ir.actions.act_window_close"}
         
         # Check if there's already an active change request
         if self.has_active_draft:
