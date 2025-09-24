@@ -20,6 +20,47 @@
     </field>
 </record>
 
+<!-- Individual Change Requests Tree View -->
+<record id="view_change_request_individual_tree" model="ir.ui.view">
+    <field name="name">change.request.individual.tree</field>
+    <field name="model">change.request</field>
+    <field name="arch" type="xml">
+        <tree multi_edit="1" create="true" delete="true" 
+              decoration-info="state == 'draft'" 
+              decoration-warning="state == 'submitted'" 
+              decoration-success="state == 'approved'" 
+              decoration-danger="state == 'rejected'">
+            <field name="name"/>
+            <field name="type"/>
+            <field name="partner_name" string="Individual"/>
+            <field name="requester_id"/>
+            <field name="state"/>
+            <field name="create_date"/>
+        </tree>
+    </field>
+</record>
+
+<!-- Group Change Requests Tree View -->
+<record id="view_change_request_group_tree" model="ir.ui.view">
+    <field name="name">change.request.group.tree</field>
+    <field name="model">change.request</field>
+    <field name="arch" type="xml">
+        <tree multi_edit="1" create="true" delete="true" 
+              decoration-info="state == 'draft'" 
+              decoration-warning="state == 'submitted'" 
+              decoration-success="state == 'approved'" 
+              decoration-danger="state == 'rejected'">
+            <field name="name"/>
+            <field name="type"/>
+            <field name="group_kind_id" string="Group Kind"/>
+            <field name="partner_name" string="Group"/>
+            <field name="requester_id"/>
+            <field name="state"/>
+            <field name="create_date"/>
+        </tree>
+    </field>
+</record>
+
 <record id="view_change_request_form" model="ir.ui.view">
     <field name="name">change.request.form</field>
     <field name="model">change.request</field>
@@ -47,7 +88,7 @@
                     <field name="type" readonly="1"/>
                     <field name="is_group" readonly="draft_record_id"/>
                     <field name="group_kind_id" invisible="type != 'create' or not is_group" readonly="draft_record_id"/>
-                    <field name="state"/>
+                    <field name="state" readonly="1"/>
                     <field name="requester_id"/>
                     <field name="partner_id"/>
                     <field name="description" placeholder="Describe the changes being requested..."/>
@@ -79,6 +120,54 @@
     </field>
 </record>
 
+<!-- Individual Change Request Form View -->
+<record id="view_change_request_individual_form" model="ir.ui.view">
+    <field name="name">change.request.individual.form</field>
+    <field name="model">change.request</field>
+    <field name="inherit_id" ref="view_change_request_form"/>
+    <field name="arch" type="xml">
+        <xpath expr="//field[@name='is_group']" position="attributes">
+            <attribute name="invisible">1</attribute>
+        </xpath>
+        <xpath expr="//field[@name='group_kind_id']" position="attributes">
+            <attribute name="invisible">1</attribute>
+        </xpath>
+        <xpath expr="//field[@name='draft_given_name']" position="attributes">
+            <attribute name="invisible">0</attribute>
+        </xpath>
+        <xpath expr="//field[@name='draft_family_name']" position="attributes">
+            <attribute name="invisible">0</attribute>
+        </xpath>
+        <xpath expr="//field[@name='state']" position="attributes">
+            <attribute name="readonly">1</attribute>
+        </xpath>
+    </field>
+</record>
+
+<!-- Group Change Request Form View -->
+<record id="view_change_request_group_form" model="ir.ui.view">
+    <field name="name">change.request.group.form</field>
+    <field name="model">change.request</field>
+    <field name="inherit_id" ref="view_change_request_form"/>
+    <field name="arch" type="xml">
+        <xpath expr="//field[@name='is_group']" position="attributes">
+            <attribute name="invisible">1</attribute>
+        </xpath>
+        <xpath expr="//field[@name='group_kind_id']" position="attributes">
+            <attribute name="invisible">0</attribute>
+        </xpath>
+        <xpath expr="//field[@name='draft_given_name']" position="attributes">
+            <attribute name="invisible">1</attribute>
+        </xpath>
+        <xpath expr="//field[@name='draft_family_name']" position="attributes">
+            <attribute name="invisible">1</attribute>
+        </xpath>
+        <xpath expr="//field[@name='state']" position="attributes">
+            <attribute name="readonly">1</attribute>
+        </xpath>
+    </field>
+</record>
+
 <record id="view_change_request_search" model="ir.ui.view">
     <field name="name">change.request.search</field>
     <field name="model">change.request</field>
@@ -93,6 +182,8 @@
             <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
             <filter string="Rejected" name="rejected" domain="[('state', '=', 'rejected')]"/>
             <filter string="My Requests" name="my_requests" domain="[('requester_id', '=', uid)]"/>
+            <filter string="Individual" name="individual" domain="[('is_group', '=', False)]"/>
+            <filter string="Group" name="group" domain="[('is_group', '=', True)]"/>
             <group expand="0" string="Group By">
                 <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
                 <filter string="Type" name="group_type" context="{'group_by': 'type'}"/>
@@ -179,15 +270,64 @@ if records:
 </field>
 </record>
 
+<!-- Individual Change Requests Action -->
+<record id="action_change_request_individual" model="ir.actions.act_window">
+    <field name="name">Individual Change Requests</field>
+    <field name="res_model">change.request</field>
+    <field name="view_mode">tree,form</field>
+    <field name="view_id" ref="view_change_request_individual_tree"/>
+    <field name="domain">[('is_group', '=', False)]</field>
+    <field name="context">{'default_is_group': False, 'search_default_individual': 1}</field>
+    <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+            Create your first individual change request!
+        </p>
+        <p>
+            Individual change requests are for changes to individual registrants.
+        </p>
+    </field>
+    <field name="views" eval="[(ref('view_change_request_individual_tree'), 'tree'), (ref('view_change_request_individual_form'), 'form')]"/>
+</record>
+
+<!-- Group Change Requests Action -->
+<record id="action_change_request_group" model="ir.actions.act_window">
+    <field name="name">Group Change Requests</field>
+    <field name="res_model">change.request</field>
+    <field name="view_mode">tree,form</field>
+    <field name="view_id" ref="view_change_request_group_tree"/>
+    <field name="domain">[('is_group', '=', True)]</field>
+    <field name="context">{'default_is_group': True, 'search_default_group': 1}</field>
+    <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+            Create your first group change request!
+        </p>
+        <p>
+            Group change requests are for changes to group registrants.
+        </p>
+    </field>
+    <field name="views" eval="[(ref('view_change_request_group_tree'), 'tree'), (ref('view_change_request_group_form'), 'form')]"/>
+</record>
 
 <menuitem id="menu_change_management_root"
-          name="Change Request"
+          name="Change Management"
           sequence="10"/>
 
-<menuitem id="menu_change_request"
-          name="Change Requests"
+<menuitem id="menu_change_request_individual"
+          name="Individual Changes"
+          parent="menu_change_management_root"
+          action="action_change_request_individual"
+          sequence="10"/>
+
+<menuitem id="menu_change_request_group"
+          name="Group Changes"
+          parent="menu_change_management_root"
+          action="action_change_request_group"
+          sequence="20"/>
+
+<menuitem id="menu_change_request_all"
+          name="All Change Requests"
           parent="menu_change_management_root"
           action="action_change_request"
-          sequence="10"/>
+          sequence="30"/>
 
 </odoo>

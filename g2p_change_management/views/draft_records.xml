@@ -327,37 +327,4 @@
         <field name="context">{'create': False}</field>
     </record>
 
-    <menuitem id="menu_draft_root" name="Change Management" sequence="10" />
-
-    <menuitem id="menu_draft_records" name="Drafts" parent="menu_draft_root" sequence="10" />
-    <menuitem
-        id="menu_draft_individual"
-        name="Individual"
-        parent="menu_draft_records"
-        action="action_draft_individual_record"
-        sequence="20"
-    />
-    <menuitem
-        id="menu_draft_group"
-        name="Group"
-        parent="menu_draft_records"
-        action="action_draft_group_record"
-        sequence="10"
-    />
-
-    <menuitem id="menu_submitted" name="Submitted" parent="menu_draft_root" sequence="20" />
-    <menuitem
-        id="menu_submitted_individual"
-        name="Individual"
-        parent="menu_submitted"
-        action="action_submitted_individual_record"
-        sequence="20"
-    />
-    <menuitem
-        id="menu_submitted_group"
-        name="Group"
-        parent="menu_submitted"
-        action="action_submitted_group_record"
-        sequence="10"
-    />
 </odoo>
