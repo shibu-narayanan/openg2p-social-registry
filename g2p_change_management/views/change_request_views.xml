@@ -90,7 +90,7 @@
                     <field name="group_kind_id" invisible="type != 'create' or not is_group" readonly="draft_record_id"/>
                     <field name="state" readonly="1"/>
                     <field name="requester_id"/>
-                    <field name="partner_id"/>
+                    <field name="partner_id" readonly="draft_record_id"/>
                     <field name="description" placeholder="Describe the changes being requested..."/>
                 </group>
                 
@@ -272,7 +272,7 @@ if records:
 
 <!-- Individual Change Requests Action -->
 <record id="action_change_request_individual" model="ir.actions.act_window">
-    <field name="name">Individual Change Requests</field>
+    <field name="name">Individuals</field>
     <field name="res_model">change.request</field>
     <field name="view_mode">tree,form</field>
     <field name="view_id" ref="view_change_request_individual_tree"/>
@@ -291,7 +291,7 @@ if records:
 
 <!-- Group Change Requests Action -->
 <record id="action_change_request_group" model="ir.actions.act_window">
-    <field name="name">Group Change Requests</field>
+    <field name="name">Groups</field>
     <field name="res_model">change.request</field>
     <field name="view_mode">tree,form</field>
     <field name="view_id" ref="view_change_request_group_tree"/>
@@ -313,21 +313,15 @@ if records:
           sequence="10"/>
 
 <menuitem id="menu_change_request_individual"
-          name="Individual Changes"
+          name="Individuals"
           parent="menu_change_management_root"
           action="action_change_request_individual"
           sequence="10"/>
 
 <menuitem id="menu_change_request_group"
-          name="Group Changes"
+          name="Groups"
           parent="menu_change_management_root"
           action="action_change_request_group"
           sequence="20"/>
-
-<menuitem id="menu_change_request_all"
-          name="All Change Requests"
-          parent="menu_change_management_root"
-          action="action_change_request"
-          sequence="30"/>
 
 </odoo>
