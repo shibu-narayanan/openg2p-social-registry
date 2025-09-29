@@ -10,9 +10,9 @@ class ResPartner(models.Model):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info("ResPartner model initialized")
+        # import logging
+        # _logger = logging.getLogger(__name__)
+        # _logger.info("ResPartner model initialized")
 
     change_request_ids = fields.One2many(
         "change.request",
@@ -359,8 +359,6 @@ class ResPartner(models.Model):
     def action_create_change_request(self):
         """Create a change request for this partner."""
         self.ensure_one()
-        # Simple test method
-        return {"type": "ir.actions.act_window_close"}
         
         # Check if there's already an active change request
         if self.has_active_draft:
