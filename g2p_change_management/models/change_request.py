@@ -1251,22 +1251,53 @@ class ChangeRequest(models.Model):
         return draft_data
 
     def action_open_partner(self):
-        """Open the partner record in read-only mode using enhanced partner view."""
+        """Open the partner record in read-only mode using registry-specific views."""
         self.ensure_one()
         
         if not self.partner_id:
             raise UserError("No partner to open.")
         
-        # Open partner form with change management context
+        # Determine which view to use based on partner type and change request state
+        if self.is_group:
+            if self.state == "approved":
+                # Use read-only group view for approved change requests
+                view_id = self.env.ref("g2p_change_management.view_groups_form_readonly").id
+            else:
+                # Use regular group view for other states
+                view_id = self.env.ref("g2p_registry_group.view_groups_form").id
+        else:
+            if self.state == "approved":
+                # Use read-only individual view for approved change requests
+                view_id = self.env.ref("g2p_change_management.view_individuals_form_readonly").id
+            else:
+                # Use regular individual view for other states
+                view_id = self.env.ref("g2p_registry_individual.view_individuals_form").id
+        
+        # Open partner form with appropriate view
+        context = {
+            "change_management_context": True,
+            "form_view_ref": view_id,
+        }
+        
+        # Add read-only context for approved change requests
+        if self.state == "approved":
+            context.update({
+                "form_view_ref": view_id,
+                "readonly": True,
+                "edit": False,
+                "create": False,
+                "delete": False,
+            })
+        
         return {
             "type": "ir.actions.act_window",
             "name": "Partner",
             "res_model": "res.partner",
             "res_id": self.partner_id.id,
             "view_mode": "form",
-            "view_id": self.env.ref("g2p_change_management.view_partner_form_change_management").id,
+            "view_id": view_id,
             "target": "current",
-            "context": {"change_management_context": True},
+            "context": context,
         }
 
     def action_edit_partner(self):

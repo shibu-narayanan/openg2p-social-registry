@@ -7,6 +7,12 @@ _logger = logging.getLogger(__name__)
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.info("ResPartner model initialized")
 
     change_request_ids = fields.One2many(
         "change.request",
@@ -28,12 +34,39 @@ class ResPartner(models.Model):
     active_change_request_id = fields.Many2one(
         "change.request",
         compute="_compute_active_change_request",
-        store=True,
-        index=True,
+        store=False,  # Don't store, always compute
         search="_search_active_change_request",
         string="Active Change Request",
         help="Active change request for this partner",
     )
+    
+    # Computed field to show active change request state
+    active_change_request_state = fields.Selection(
+        selection=[
+            ("draft", "Draft"),
+            ("submitted", "Submitted"),
+            ("approved", "Approved"),
+            ("rejected", "Rejected"),
+        ],
+        compute="_compute_active_change_request_state",
+        store=False,  # Don't store, always compute
+        string="Active Change Request State",
+        help="State of the active change request for this partner",
+    )
+    
+    @property
+    def active_change_request_state_property(self):
+        """Property to force computation of active change request state."""
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.info(f"PROPERTY ACCESS - Partner {self.id}")
+        
+        # Force computation
+        self._compute_active_change_request()
+        self._compute_active_change_request_state()
+        
+        _logger.info(f"PROPERTY RESULT - Partner {self.id}: active_change_request_state = {self.active_change_request_state}")
+        return self.active_change_request_state
     
     # Draft members field - Many2many for draft individual members
     draft_member_ids = fields.Many2many(
@@ -60,14 +93,83 @@ class ResPartner(models.Model):
     
 
 
-    @api.depends("change_request_ids", "change_request_ids.state")
+    @api.depends("change_request_ids")
     def _compute_active_change_request(self):
         """Compute the active change request for this partner."""
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.info(f"_compute_active_change_request called for {len(self)} partners")
+        
         for record in self:
+            _logger.info(f"Partner {record.id}: Total change requests = {len(record.change_request_ids)}")
+            
+            # Log all change requests and their states
+            for cr in record.change_request_ids:
+                _logger.info(f"Partner {record.id}: Change Request {cr.id} - State: {cr.state}")
+            
+            # Include all change requests (draft, submitted, approved, rejected) to track state
             active_crs = record.change_request_ids.filtered(
-                lambda cr: cr.state in ['draft', 'submitted']
+                lambda cr: cr.state in ['draft', 'submitted', 'approved', 'rejected']
             )
-            record.active_change_request_id = active_crs[0] if active_crs else False
+            _logger.info(f"Partner {record.id}: Filtered active change requests = {len(active_crs)}")
+            
+            # Get the most recent change request (by ID, which should be the latest created)
+            if active_crs:
+                most_recent = active_crs.sorted('id', reverse=True)[0]
+                record.active_change_request_id = most_recent
+                _logger.info(f"Partner {record.id}: Selected change request {most_recent.id} with state {most_recent.state}")
+            else:
+                record.active_change_request_id = False
+                _logger.info(f"Partner {record.id}: No active change requests found")
+    
+    def action_debug_active_change_request(self):
+        """Manual method to debug active change request computation."""
+        import logging
+        _logger = logging.getLogger(__name__)
+        for record in self:
+            _logger.info(f"DEBUG - Partner {record.id}: change_request_ids = {record.change_request_ids.ids}")
+            for cr in record.change_request_ids:
+                _logger.info(f"DEBUG - Partner {record.id}: CR {cr.id} state = {cr.state}")
+            
+            # Force computation manually
+            record._compute_active_change_request()
+            record._compute_active_change_request_state()
+            
+            _logger.info(f"DEBUG - Partner {record.id}: active_change_request_id = {record.active_change_request_id.id if record.active_change_request_id else False}")
+            _logger.info(f"DEBUG - Partner {record.id}: active_change_request_state = {record.active_change_request_state}")
+        return True
+    
+    def action_force_compute_fields(self):
+        """Force computation of all computed fields."""
+        import logging
+        _logger = logging.getLogger(__name__)
+        for record in self:
+            _logger.info(f"FORCE COMPUTE - Partner {record.id}")
+            # Force computation of all computed fields
+            record._compute_active_change_request()
+            record._compute_active_change_request_state()
+            record._compute_has_active_draft()
+            _logger.info(f"FORCE COMPUTE - Partner {record.id}: active_change_request_state = {record.active_change_request_state}")
+        return True
+
+    @api.depends("active_change_request_id", "active_change_request_id.state")
+    def _compute_active_change_request_state(self):
+        """Compute the state of the active change request for this partner."""
+        import logging
+        _logger = logging.getLogger(__name__)
+        
+        for record in self:
+            # Check if we're in draft context with change_request_state
+            if self.env.context.get('draft') and 'change_request_state' in self.env.context:
+                change_request_state = self.env.context.get('change_request_state')
+                record.active_change_request_state = change_request_state
+                _logger.info(f"Partner {record.id}: Using context change_request_state = {change_request_state}")
+            elif record.active_change_request_id:
+                record.active_change_request_state = record.active_change_request_id.state
+                _logger.info(f"Partner {record.id}: Using computed active_change_request_state = {record.active_change_request_state}")
+            else:
+                record.active_change_request_state = False
+                _logger.info(f"Partner {record.id}: No active change request, state = False")
 
     @api.model
     def create(self, vals):

@@ -384,6 +384,13 @@ class G2PDraftRecord(models.Model):
         context_data, additional_g2p_info = self._process_json_data(json_data)
 
         context_data["active_id"] = active_id
+        
+        # Get the change request state for this draft record
+        change_request = self.env["change.request"].search([
+            ("draft_record_id", "=", self.id)
+        ], order="create_date desc", limit=1)
+        
+        change_request_state = change_request.state if change_request else False
 
         _logger.info("The Additionla info")
         _logger.info(additional_g2p_info)
@@ -402,6 +409,7 @@ class G2PDraftRecord(models.Model):
                 "default_individual_membership_ids": json_data.get("individual_membership_ids", []),
                 "default_reg_ids": json_data.get("reg_ids", []),
                 "default_is_group": json_data.get("is_group", False),
+                "change_request_state": change_request_state,
             },
         }
 
